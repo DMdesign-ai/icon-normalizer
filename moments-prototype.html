@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=393, initial-scale=1.0" />
+  <title>Rundi — Moments Prototype</title>
+  <style>
+    /* ─────────────────────────────────────────
+       FIGMA DESIGN TOKENS — from GlxMr2W1ltdGgIBhK8eqf1
+    ───────────────────────────────────────── */
+    :root {
+      /* Cashback design system — exact tokens */
+      --surface: #ffffff;
+      --surface-inverse: #171717;
+      --on-surface-emphasis: #000000;
+      --on-surface: #262626;
+      --on-surface-secondary: #525252;
+      --on-surface-quaternary: #d4d4d4;
+      --labels-primary: #000000;
+      --labels-vibrant-primary: #1a1a1a;
+      --labels-vibrant-secondary: #727272;
+      --status-success: #4caf50;
+      --status-warning: #f5a623;
+      --brand-secondary: #007aff;
+      --fills-tertiary: rgba(118, 118, 128, 0.12);
+      --segmented-control-selected-fill: #ffffff;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.16), 0 0 4px rgba(0,0,0,0.08);
+
+      /* Spacing */
+      --spacing-02: 2px;
+      --spacing-04: 4px;
+      --spacing-08: 8px;
+      --spacing-12: 12px;
+      --spacing-16: 16px;
+      --spacing-24: 24px;
+      --inset-sm: 16px;
+
+      /* Typography */
+      --font-family: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+      --body-sm-size: 13px;     --body-sm-line-height: 18px;   --body-sm-letter-spacing: -0.08px;
+      --body-md-size: 15px;     --body-md-line-height: 20px;   --body-md-letter-spacing: -0.23px;
+      --body-lg-size: 17px;     --body-lg-line-height: 22px;   --body-lg-letter-spacing: -0.43px;
+      --heading-sm-size: 15px;  --heading-sm-line-height: 20px; --heading-sm-letter-spacing: -0.23px;
+      --heading-2xl-size: 28px; --heading-2xl-line-height: 34px; --heading-2xl-letter-spacing: 0.38px;
+      --headline-size: 17px;    --headline-line-height: 22px;  --headline-letter-spacing: -0.43px;
+      --large-title-size: 34px; --large-title-line-height: 41px; --large-title-letter-spacing: 0.4px;
+
+      /* Payment file design tokens — nB5eZagt1lviIIgGKj86MX */
+      --border-weaker: #a8a8a8;
+      --border-weakest: #cccccc;
+      --surface-strong: #dfdfdf;
+      --shadow-light: 0px 1px 2px 0px rgba(0,0,0,0.02);
+      --caption-size: 12px;
+      --caption-line-height: 16px;
+      --caption-letter-spacing: 0px;
+
+      /* Rundi Moments — brand additions */
+      --rundi-teal: #187A6C;
+      --rundi-teal-soft: #E4F3F0;
+      --rundi-teal-border: rgba(24,122,108,0.25);
+      --rundi-red: #C8352A;
+      --rundi-red-soft: #FAE8E6;
+      --rundi-gold: #B8912A;
+      --rundi-gold-soft: #F7F0D9;
+    }
+
+    /* ─── RESET ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #e5e5ea;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 0 80px;
+      min-height: 100vh;
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── PHONE SHELL ─── */
+    .phone {
+      width: 393px;
+      height: 852px;
+      background: var(--surface);
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.32), 0 4px 16px rgba(0,0,0,0.12);
+      flex-shrink: 0;
+    }
+
+    /* ─── STATUS BAR ─── */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px 0;
+      height: 54px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+    .status-time {
+      font-size: var(--headline-size);
+      font-weight: 600;
+      line-height: var(--headline-line-height);
+      letter-spacing: var(--headline-letter-spacing);
+      color: var(--on-surface-emphasis);
+    }
+    .status-icons { display: flex; align-items: center; gap: 7px; }
+    .signal-bars { display: flex; align-items: flex-end; gap: 1.5px; height: 11px; }
+    .signal-bars span { display: block; width: 3px; background: var(--on-surface-emphasis); border-radius: 0.8px; }
+    .signal-bars span:nth-child(1) { height: 4px; }
+    .signal-bars span:nth-child(2) { height: 6px; }
+    .signal-bars span:nth-child(3) { height: 8.5px; }
+    .signal-bars span:nth-child(4) { height: 11px; }
+    .battery { display: flex; align-items: center; gap: 1px; }
+    .battery-body { width: 25px; height: 12px; border: 1.2px solid rgba(0,0,0,0.35); border-radius: 3.8px; padding: 2px; }
+    .battery-fill { width: 100%; height: 100%; background: var(--on-surface-emphasis); border-radius: 1.6px; }
+    .battery-cap { width: 1.5px; height: 5px; background: rgba(0,0,0,0.4); border-radius: 0 1px 1px 0; }
+
+    /* ─── SCREEN SYSTEM ─── */
+    .screen {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: none;
+      flex-direction: column;
+    }
+    .screen.active { display: flex; }
+
+    /* ─── NAV BAR (screens 1–4) — Payment file: h=44px, iOS-native back btn ─── */
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      padding: 0 var(--spacing-16);
+      position: relative;
+      flex-shrink: 0;
+      height: 44px;
+      background: white;
+    }
+    /* Bottom border — Payment file uses #a8a8a8 (border-weaker) */
+    .nav-bar::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 0.5px;
+      background: var(--border-weaker);
+    }
+    /* iOS-native back button: blue chevron + "Back" text, no background pill */
+    .nav-back-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: none;
+      border-radius: 0; border: none; cursor: pointer; flex-shrink: 0;
+      color: var(--brand-secondary);
+      font-family: var(--font-family);
+      font-size: var(--body-lg-size);
+      font-weight: 400;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .nav-title {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: var(--headline-size);
+      font-weight: 590;
+      line-height: var(--headline-line-height);
+      letter-spacing: var(--headline-letter-spacing);
+      color: var(--on-surface);
+      white-space: nowrap;
+    }
+    .nav-action-btn {
+      margin-left: auto;
+      display: flex; align-items: center;
+      background: none;
+      border: none; cursor: pointer; flex-shrink: 0;
+      color: var(--brand-secondary);
+      font-family: var(--font-family);
+      font-size: var(--body-lg-size);
+      font-weight: 400;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── CONTENT AREA ─── */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 12px var(--inset-sm);
+      background: #f5f5f5;
+      overflow-y: auto;
+    }
+
+    /* ─── PRIMARY BUTTON ─── */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; min-height: 56px;
+      background: #262626;
+      color: white;
+      border: none; border-radius: 6px;
+      font-family: var(--font-family);
+      font-size: var(--body-lg-size);
+      font-weight: 590;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      cursor: pointer;
+      padding: var(--spacing-12) var(--spacing-24);
+      -webkit-font-smoothing: antialiased;
+    }
+    .btn-primary:active { opacity: 0.85; }
+    .btn-primary.teal { background: var(--rundi-teal); }
+
+    /* ─── SECONDARY BUTTON / LINK ─── */
+    .btn-link {
+      background: none; border: none;
+      font-family: var(--font-family);
+      font-size: var(--body-md-size);
+      font-weight: 500;
+      color: var(--brand-secondary);
+      cursor: pointer;
+      padding: 12px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── CARD — Payment file: 8px radius, near-invisible shadow ─── */
+    .card {
+      background: var(--surface);
+      border-radius: 8px;
+      box-shadow: var(--shadow-light);
+      padding: var(--spacing-16);
+    }
+    .card.teal-border { border: 1.5px solid var(--rundi-teal-border); }
+
+    /* ─── DIVIDER — Payment file: #cccccc (border-weakest) ─── */
+    .divider { height: 0.5px; background: var(--border-weakest); }
+
+    /* ─── BADGE ─── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 100px;
+      font-family: var(--font-family);
+      font-size: 12px; font-weight: 600;
+      letter-spacing: -0.08px;
+    }
+    .badge.teal { background: var(--rundi-teal-soft); color: var(--rundi-teal); }
+    .badge.gold { background: var(--rundi-gold-soft); color: var(--rundi-gold); }
+    .badge.red  { background: var(--rundi-red-soft); color: var(--rundi-red); }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes checkmarkScale {
+      0%   { transform: scale(0); opacity: 0; }
+      60%  { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; } to { opacity: 1; }
+    }
+    .anim-fade-up { animation: fadeUp 0.35s ease both; }
+    .anim-delay-1 { animation-delay: 0.12s; }
+    .anim-delay-2 { animation-delay: 0.24s; }
+    .anim-delay-3 { animation-delay: 0.36s; }
+    .anim-delay-4 { animation-delay: 0.48s; }
+
+    /* ─── CONTACT CHIP ─── */
+    .contact-row {
+      display: flex; align-items: center; gap: var(--spacing-12);
+      padding: 13px 0;
+    }
+    .avatar {
+      width: 44px; height: 44px; border-radius: 1000px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; flex-shrink: 0;
+      color: white;
+    }
+    .contact-name {
+      font-size: var(--body-lg-size);
+      font-weight: 400;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      color: var(--on-surface);
+      flex: 1;
+    }
+    .contact-amount {
+      font-size: var(--body-md-size);
+      font-weight: 600;
+      color: var(--on-surface-secondary);
+    }
+    .checkmark {
+      width: 24px; height: 24px; border-radius: 1000px;
+      border: 1.5px solid var(--on-surface-quaternary);
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+    .checkmark.selected {
+      background: var(--rundi-teal);
+      border-color: var(--rundi-teal);
+    }
+
+    /* ─── TAG PILL ─── */
+    .tag-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tag-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 14px;
+      border-radius: 100px;
+      background: var(--fills-tertiary);
+      border: 1.5px solid transparent;
+      font-family: var(--font-family);
+      font-size: var(--body-sm-size);
+      font-weight: 500;
+      color: var(--on-surface);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    .tag-pill.active {
+      background: var(--rundi-teal-soft);
+      border-color: var(--rundi-teal);
+      color: var(--rundi-teal);
+    }
+
+    /* ─── SIGNAL ROW — Payment file: compact icon(16px) + caption(12px) + value(15px) ─── */
+    .signal-row {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 8px 16px;
+      background: white;
+      border-radius: 0;   /* clipped by parent card */
+      box-shadow: none;
+    }
+    .signal-icon {
+      /* 16×16 plain icon container — no background box */
+      width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px; /* optical align to caption text */
+      background: none;
+      border-radius: 0;
+    }
+    .signal-body { flex: 1; }
+    /* Caption (small label above — iOS/Caption 1) */
+    .signal-label {
+      font-size: var(--caption-size);     /* 12px — was 15px semibold */
+      font-weight: 400;
+      line-height: var(--caption-line-height);
+      letter-spacing: var(--caption-letter-spacing);
+      color: var(--on-surface);
+    }
+    /* Value (primary content text below — iOS/Subhead) */
+    .signal-desc {
+      font-size: var(--body-md-size);     /* 15px — was 13px */
+      font-weight: 400;
+      line-height: var(--body-md-line-height);
+      letter-spacing: var(--body-md-letter-spacing);
+      color: var(--on-surface);           /* primary — was on-surface-secondary */
+      margin-top: 0;
+    }
+
+    /* ─── MOMENT PREVIEW (recipient view) ─── */
+    .moment-preview {
+      background: var(--fills-tertiary);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .moment-from {
+      font-size: var(--body-sm-size);
+      color: var(--on-surface-secondary);
+    }
+    .moment-bubble {
+      background: white;
+      border-radius: 12px 12px 12px 2px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .moment-amount {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--on-surface);
+      letter-spacing: -0.4px;
+    }
+    .moment-tag {
+      font-size: var(--body-sm-size);
+      color: var(--on-surface-secondary);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+    .moment-msg {
+      font-size: var(--body-sm-size);
+      color: var(--on-surface-secondary);
+      margin-top: 4px;
+    }
+    .moment-settle {
+      display: flex; justify-content: center;
+      margin-top: 4px;
+    }
+    .settle-btn {
+      padding: 8px 24px;
+      background: var(--on-surface);
+      color: white;
+      border: none; border-radius: 6px;
+      font-family: var(--font-family);
+      font-size: var(--body-sm-size);
+      font-weight: 590;
+      cursor: default;
+    }
+
+    /* ─── HOME — SPOTLIGHT CARD ─── */
+    /* Figma node 1:730 — outer card: flex-col, items-start, pb-14, overflow-visible, relative */
+    .spotlight-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      flex-shrink: 0;
+      cursor: pointer;
+      padding-bottom: 14px;
+      width: 100%;
+    }
+    /* Inner container — clips, border + 8px radius + mb-[-14px] so headline overlaps bottom */
+    .spotlight-container {
+      border: 1px solid var(--on-surface-quaternary);
+      border-radius: 8px;
+      overflow: clip;
+      position: relative;
+      flex-shrink: 0;
+      width: 100%;
+      margin-bottom: -14px;
+    }
+    .spotlight-image {
+      width: 100%;
+      height: 103px;
+      background: linear-gradient(135deg, #F5A852 0%, #E96B4A 38%, #D44060 68%, #C8356A 100%);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .spotlight-contact {
+      position: absolute;
+      top: 15px; left: 15px;
+      display: flex; flex-direction: column; gap: 4px;
+      color: white;
+    }
+    .spotlight-contact-name {
+      font-size: var(--body-lg-size);
+      font-weight: 700;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+    }
+    .spotlight-contact-desc {
+      font-size: var(--body-lg-size);
+      font-weight: 400;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+    }
+    /* Close button: absolute on outer card, top-right (within image zone) */
+    .spotlight-close {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 32px; height: 32px;
+      border-radius: 99999px;
+      background: rgba(255,255,255,0.6);
+      display: flex; align-items: center; justify-content: center;
+      border: none; cursor: pointer;
+      z-index: 2;
+    }
+    /* Headline: sibling of container, overlaps its bottom via container's mb-[-14px] */
+    /* Figma: flex-col, items-start, mb-[-14px], pb-2, pl-16 */
+    .spotlight-headline {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: -14px;
+      padding-bottom: 2px;
+      padding-left: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    /* Each chip: bg-#171717, px-8, py-1, mb-[-2px] so lines stack flush */
+    .spotlight-headline-bg {
+      display: inline-block;
+      background: #171717;
+      padding: 1px 8px;
+      color: white;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 25px;
+      letter-spacing: -0.45px;
+      margin-bottom: -2px;
+    }
+
+    /* ─── HOME — SECTION HEADER ─── */
+    .section-header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 0px;
+      height: 20px;
+    }
+    .section-header-title {
+      flex: 1;
+      font-size: var(--body-sm-size);
+      font-weight: 590;
+      line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing);
+      color: var(--on-surface);
+    }
+    .section-header-btn {
+      font-size: var(--body-sm-size);
+      font-weight: 590;
+      color: var(--brand-secondary);
+      background: none; border: none; cursor: pointer;
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── HOME — TRANSACTION ITEM ─── */
+    /* Figma: gap-12, p-16, items-start, bg white */
+    .trx-item {
+      display: flex; align-items: flex-start;
+      gap: var(--spacing-12);
+      padding: var(--spacing-16);
+      background: white;
+    }
+    /* Figma: size-32, border-radius: Corner/Full = 1000px, bg surfaceVariant2 #f5f5f5 */
+    .trx-icon {
+      width: 32px; height: 32px;
+      border-radius: 1000px;
+      background: #f5f5f5;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .trx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--spacing-02); }
+    .trx-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-12); }
+    .trx-name {
+      font-size: var(--body-lg-size);
+      font-weight: 400;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      color: var(--on-surface);
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .trx-amount-neg {
+      font-size: var(--body-lg-size);
+      font-weight: 590;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      color: var(--on-surface-secondary);
+      flex-shrink: 0;
+    }
+    .trx-amount-pos {
+      font-size: var(--body-lg-size);
+      font-weight: 590;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      color: var(--brand-success, #4caf50);
+      flex-shrink: 0;
+    }
+    .trx-bottom { display: flex; align-items: center; }
+    .trx-date {
+      font-size: var(--body-sm-size);
+      font-weight: 400;
+      line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing);
+      color: var(--on-surface-secondary);
+    }
+    .trx-divider { height: 0.5px; background: var(--on-surface-quaternary); margin-left: 60px; }
+
+    /* ─── HOME — PARTNER FUNCTION CARDS ─── */
+    .partner-cards {
+      display: flex; gap: 18px; align-items: flex-start;
+    }
+    .partner-card-wrap {
+      flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center;
+    }
+    .partner-card {
+      background: white;
+      border-radius: 8px;
+      height: 72px;
+      width: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .partner-card-label {
+      font-size: var(--body-sm-size);
+      font-weight: 400;
+      line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing);
+      color: var(--on-surface);
+      text-align: center;
+      width: 100%;
+    }
+
+    /* ─── HOME — P2P BUTTONS ─── */
+    .p2p-row {
+      display: flex; gap: 8px; align-items: stretch;
+    }
+    .p2p-btn {
+      flex: 1;
+      background: white;
+      border-radius: 6px;
+      border: none; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: var(--spacing-12);
+      padding: var(--spacing-24);
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+    .p2p-btn-label {
+      font-size: var(--body-md-size);
+      font-weight: 590;
+      line-height: var(--body-md-line-height);
+      letter-spacing: var(--body-md-letter-spacing);
+      color: var(--on-surface);
+      text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+    }
+
+    /* ─── HOME — PAY BUTTON ─── */
+    .pay-btn {
+      width: 100%;
+      min-height: 56px;
+      background: #262626;
+      border-radius: 6px;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      gap: var(--spacing-12);
+      padding: var(--spacing-12) var(--spacing-24);
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+    .pay-btn-label {
+      font-size: var(--body-lg-size);
+      font-weight: 590;
+      line-height: var(--body-lg-line-height);
+      letter-spacing: var(--body-lg-letter-spacing);
+      color: white;
+    }
+
+    /* ─── SUCCESS CHECK ─── */
+    .success-check {
+      width: 72px; height: 72px; border-radius: 1000px;
+      background: var(--rundi-teal);
+      display: flex; align-items: center; justify-content: center;
+      animation: checkmarkScale 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    /* ─── BOTTOM SAFE AREA — home indicator pill ─── */
+    .bottom-safe {
+      height: 34px; flex-shrink: 0;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 8px;
+      background: white;
+    }
+    .bottom-safe::after {
+      content: '';
+      width: 139px; height: 5px;
+      background: black; border-radius: 100px;
+    }
+
+    /* ─── TEXT HELPERS ─── */
+    .label-mono {
+      font-size: var(--body-sm-size); font-weight: 590;
+      color: var(--on-surface-secondary);
+    }
+    .section-title {
+      font-size: var(--heading-sm-size);
+      font-weight: 590;
+      line-height: var(--heading-sm-line-height);
+      color: var(--on-surface);
+    }
+    .text-teal { color: var(--rundi-teal); }
+    .text-secondary { color: var(--on-surface-secondary); }
+    .text-emphasis { color: var(--on-surface-emphasis); }
+    .page-title {
+      font-size: var(--large-title-size);
+      font-weight: 700;
+      line-height: var(--large-title-line-height);
+      letter-spacing: var(--large-title-letter-spacing);
+      color: var(--labels-vibrant-primary);
+    }
+    .page-subtitle {
+      font-size: var(--body-md-size);
+      color: var(--labels-vibrant-secondary);
+      line-height: var(--body-md-line-height);
+      margin-top: 4px;
+    }
+
+    /* ─── TEXTAREA ─── */
+    .msg-input {
+      width: 100%; padding: 14px;
+      background: var(--fills-tertiary);
+      border: none; border-radius: 8px;
+      font-family: var(--font-family);
+      font-size: var(--body-md-size);
+      color: var(--on-surface);
+      resize: none;
+      outline: none;
+      line-height: var(--body-md-line-height);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── INFO NOTE ─── */
+    .info-note {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 10px 14px;
+      background: var(--fills-tertiary);
+      border-radius: 8px;
+      font-size: var(--body-sm-size);
+      color: var(--on-surface-secondary);
+      line-height: var(--body-sm-line-height);
+    }
+  </style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 1 — HOME (Figma: Device Starter Screen 259:26538)
+  ══════════════════════════════════════════ -->
+  <div class="screen active" id="screen-0" style="background:#f5f5f5;">
+
+    <!-- ── Top Navigation ── -->
+    <div style="background:white; flex-shrink:0; position:relative;">
+
+      <!-- Status Bar (h=54) -->
+      <div class="status-bar" style="background:white;">
+        <span class="status-time">9:41</span>
+        <div class="status-icons">
+          <div class="signal-bars"><span></span><span></span><span></span><span></span></div>
+          <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+            <path d="M8.5 8.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4Z" fill="black"/>
+            <path d="M4.55 6.05a5.5 5.5 0 0 1 7.9 0L13.87 4.63a7.5 7.5 0 0 0-10.74 0L4.55 6.05Z" fill="black"/>
+            <path d="M1.67 3.17a9.5 9.5 0 0 1 13.66 0l1.42-1.42A11.5 11.5 0 0 0 .25 1.75L1.67 3.17Z" fill="black"/>
+          </svg>
+          <div class="battery">
+            <div class="battery-body"><div class="battery-fill"></div></div>
+            <div class="battery-cap"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav Bar (h=42) — centered balance + "···" menu -->
+      <div style="height:42px; position:relative; display:flex; align-items:center; justify-content:center;">
+        <!-- Center: CHF 120.00 + -->
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:17px; font-weight:590; line-height:22px; letter-spacing:-0.43px; color:var(--on-surface);">CHF 120.00</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1.5v13M1.5 8h13" stroke="#262626" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <!-- Right: ··· -->
+        <div style="position:absolute; right:16px; top:50%; transform:translateY(-50%); width:24px; height:24px; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="5" viewBox="0 0 20 5" fill="none">
+            <circle cx="2.5" cy="2.5" r="2" fill="#262626"/>
+            <circle cx="10" cy="2.5" r="2" fill="#262626"/>
+            <circle cx="17.5" cy="2.5" r="2" fill="#262626"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Bottom border -->
+      <div style="position:absolute; bottom:0; left:0; right:0; height:0.5px; background:#d3e3fd;"></div>
+    </div>
+
+    <!-- ── Content ── -->
+    <div class="content" style="gap:16px; padding:12px 16px 12px; background:#f5f5f5; overflow-y:auto;">
+
+      <!-- Spotlight Card — Figma node 1:730 -->
+      <!-- Outer wrapper: pb-14, overflow visible; flex-col, items-start -->
+      <div class="spotlight-card" onclick="goTo(1)">
+        <!-- Container: border + radius-8 + overflow clip + mb-[-14px] -->
+        <div class="spotlight-container">
+          <!-- Gradient image area (h=103px) with contact overlay inside -->
+          <div class="spotlight-image">
+            <div class="spotlight-contact">
+              <span class="spotlight-contact-name">+41 77 171 17 17</span>
+              <span class="spotlight-contact-desc">17 beers in the pub 🍻</span>
+            </div>
+          </div>
+        </div>
+        <!-- Headline: sibling of Container, sits BELOW it (overlapping via mb-[-14px] on container) -->
+        <div class="spotlight-headline">
+          <span class="spotlight-headline-bg">You have received CHF 85.00</span>
+          <span class="spotlight-headline-bg">Headline 2</span>
+        </div>
+        <!-- Close button: absolute on outer card, top-right corner -->
+        <button class="spotlight-close" onclick="event.stopPropagation()">
+          <!-- 16×16 icon container: Figma inset 18.75% = ~3px per side -->
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 3L13 13M13 3L3 13" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Transactions section -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="section-header" style="padding:0 0;">
+          <span class="section-header-title">Transactions</span>
+          <button class="section-header-btn">Show all</button>
+        </div>
+
+        <!-- Single transaction row (Patrizia, +16.00) -->
+        <div class="trx-item" style="border-radius:0;">
+          <div class="trx-icon">
+            <!-- Account icon -->
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="6" r="3" stroke="#525252" stroke-width="1.2"/>
+              <path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#525252" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="trx-body">
+            <div class="trx-top">
+              <span class="trx-name">Patrizia</span>
+              <div style="display:flex; align-items:flex-start; gap:10px;">
+                <span class="trx-amount-pos">+16.00</span>
+              </div>
+            </div>
+            <div class="trx-bottom">
+              <span class="trx-date">23 Jun</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Partner functions section -->
+      <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+        <div class="section-header" style="width:100%;">
+          <span class="section-header-title">Partner functions</span>
+          <button class="section-header-btn">Show all</button>
+        </div>
+
+        <div class="partner-cards" style="width:100%;">
+          <!-- Super Deals -->
+          <div class="partner-card-wrap">
+            <div class="partner-card">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="3" y="8" width="20" height="16" rx="2" stroke="#262626" stroke-width="1.4"/>
+                <path d="M8 8V6a5 5 0 0 1 10 0v2" stroke="#262626" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="23" cy="22" r="6" fill="white" stroke="#262626" stroke-width="1.2"/>
+                <path d="M20.5 22l1.5 1.5L25.5 19.5" stroke="#262626" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="partner-card-label">Super Deals</span>
+          </div>
+          <!-- Parking -->
+          <div class="partner-card-wrap">
+            <div class="partner-card">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="6" y="6" width="20" height="20" rx="3" stroke="#262626" stroke-width="1.4"/>
+                <path d="M12 22V10h5a4 4 0 0 1 0 8h-5" stroke="#262626" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="partner-card-label">Parking</span>
+          </div>
+          <!-- Spin and win -->
+          <div class="partner-card-wrap">
+            <div class="partner-card">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="11" stroke="#262626" stroke-width="1.4"/>
+                <path d="M16 5v11l7.8 4.5" stroke="#262626" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M8.2 20.5L16 16V5" stroke="#262626" stroke-width="1.4" stroke-linecap="round" opacity="0.35"/>
+                <circle cx="16" cy="16" r="2" fill="#262626"/>
+              </svg>
+            </div>
+            <span class="partner-card-label">Spin and win</span>
+          </div>
+          <!-- Cashback -->
+          <div class="partner-card-wrap">
+            <div class="partner-card">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path d="M7 8h14a2 2 0 0 1 2 2v10" stroke="#262626" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M7 8l-4 4h18" stroke="#262626" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M25 16l-4 4H7" stroke="#262626" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="partner-card-label">Cashback</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2P — Send + Request and split -->
+      <div class="p2p-row" style="flex:1; min-height:100px;">
+        <!-- Send -->
+        <button class="p2p-btn">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="5" y="20" width="9" height="8" rx="1" stroke="#262626" stroke-width="1.4"/>
+            <text x="7.5" y="27" font-size="7" font-family="sans-serif" font-weight="700" fill="#262626">CHF</text>
+            <path d="M16 18V6M16 6l-5 5M16 6l5 5" stroke="#262626" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="p2p-btn-label">Send</span>
+        </button>
+        <!-- Request and split — this is the Moments entry point -->
+        <button class="p2p-btn" onclick="goTo(1)">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <rect x="18" y="4" width="9" height="8" rx="1" stroke="#262626" stroke-width="1.4"/>
+            <text x="19.5" y="11" font-size="7" font-family="sans-serif" font-weight="700" fill="#262626">CHF</text>
+            <path d="M16 14v12M16 26l-5-5M16 26l5-5" stroke="#262626" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="p2p-btn-label">Request and split</span>
+        </button>
+      </div>
+
+      <!-- Pay button -->
+      <button class="pay-btn">
+        <!-- QR/Pay icon -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="9" height="9" rx="1.5" stroke="white" stroke-width="1.4"/>
+          <rect x="4" y="4" width="5" height="5" rx="0.5" fill="white"/>
+          <rect x="13" y="2" width="9" height="9" rx="1.5" stroke="white" stroke-width="1.4"/>
+          <rect x="15" y="4" width="5" height="5" rx="0.5" fill="white"/>
+          <rect x="2" y="13" width="9" height="9" rx="1.5" stroke="white" stroke-width="1.4"/>
+          <rect x="4" y="15" width="5" height="5" rx="0.5" fill="white"/>
+          <rect x="13" y="13" width="4" height="4" rx="0.5" fill="white"/>
+          <rect x="19" y="13" width="3" height="3" rx="0.5" fill="white"/>
+          <rect x="13" y="19" width="3" height="3" rx="0.5" fill="white"/>
+          <rect x="18" y="18" width="4" height="4" rx="0.5" fill="white"/>
+        </svg>
+        <span class="pay-btn-label">Pay</span>
+      </button>
+
+    </div>
+
+    <!-- Home Indicator — 34px zone, pill centered 8px from bottom -->
+    <div style="height:34px; background:#f5f5f5; display:flex; align-items:flex-end; justify-content:center; padding-bottom:8px; flex-shrink:0;">
+      <div style="width:139px; height:5px; background:black; border-radius:100px;"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 2 — MOMENTS: Context inference
+  ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-1">
+
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <div class="signal-bars"><span></span><span></span><span></span><span></span></div>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+          <path d="M8 8.8a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 8 8.8Z" fill="currentColor"/>
+          <path d="M4.05 6.05a5.5 5.5 0 0 1 7.9 0l1.42-1.42a7.5 7.5 0 0 0-10.74 0L4.05 6.05Z" fill="currentColor"/>
+          <path d="M1.17 3.17a9.5 9.5 0 0 1 13.66 0l1.42-1.42A11.5 11.5 0 0 0-.25 1.75L1.17 3.17Z" fill="currentColor"/>
+        </svg>
+        <div class="battery">
+          <div class="battery-body"><div class="battery-fill"></div></div>
+          <div class="battery-cap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-back-btn" onclick="goTo(0)">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+          <path d="M8 1L1.5 7.5L8 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Back</span>
+      </button>
+      <span class="nav-title">Request</span>
+    </div>
+
+    <div class="content" style="gap:16px; padding:12px 16px; background:#f5f5f5;" id="signals-content">
+
+      <!-- Merchant context banner -->
+      <div class="card" style="display:flex; align-items:center; gap:16px;">
+        <div style="width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0;">🍽</div>
+        <div style="flex:1;">
+          <div style="font-size:var(--caption-size); font-weight:400; line-height:var(--caption-line-height); color:var(--on-surface);">Merchant receipt</div>
+          <div style="font-size:var(--body-md-size); font-weight:400; line-height:var(--body-md-line-height); letter-spacing:var(--body-md-letter-spacing); color:var(--on-surface); margin-top:0;">Haus Hiltl · CHF 120 · 2 min ago</div>
+        </div>
+      </div>
+
+      <!-- Section label + signal rows — wrapped in a card like TRX section -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="section-header">
+          <span class="section-header-title">Context signals</span>
+        </div>
+        <!-- Signal rows inside a white card — Payment file style: 8px radius, light shadow -->
+        <div style="background:white; border-radius:8px; box-shadow:var(--shadow-light); overflow:hidden;">
+          <div class="signal-row anim-fade-up" style="animation-delay:0.05s; border-bottom:0.5px solid var(--border-weakest);">
+            <div class="signal-icon">📊</div>
+            <div class="signal-body">
+              <div class="signal-label">Transaction patterns</div>
+              <div class="signal-desc">You dine with 2–4 people on Sat evenings</div>
+            </div>
+          </div>
+
+          <div class="signal-row anim-fade-up" style="animation-delay:0.18s; border-bottom:0.5px solid var(--border-weakest);">
+            <div class="signal-icon">🏪</div>
+            <div class="signal-body">
+              <div class="signal-label">Merchant receipt</div>
+              <div class="signal-desc">Your TWINT receipt → Haus Hiltl</div>
+            </div>
+          </div>
+
+          <div class="signal-row anim-fade-up" style="animation-delay:0.31s;">
+            <div class="signal-icon">🕐</div>
+            <div class="signal-body">
+              <div class="signal-label">Saturday evening</div>
+              <div class="signal-desc">Social dining window · 8:47 PM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suggestion card -->
+      <div class="card anim-fade-up" style="animation-delay:0.48s; display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span class="label-mono">Moments suggestion</span>
+          <span style="font-size:var(--body-sm-size); font-weight:590; color:var(--on-surface-secondary);">High confidence</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:28px;">🍕</span>
+          <div>
+            <div style="font-size:var(--heading-sm-size); font-weight:700; color:var(--on-surface);">Dinner at Hiltl</div>
+            <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary); font-weight:400; margin-top:2px;">CHF 30 / person · split 4 ways</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary);">
+          Based on your merchant receipt + Saturday dinner pattern with your usual group.
+        </div>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <!-- CTA -->
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn-primary" onclick="goTo(2)">Looks right → Select contacts</button>
+        <button class="btn-link" onclick="goTo(2)">Edit suggestion</button>
+      </div>
+    </div>
+
+    <div class="bottom-safe"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 3 — CONTACT SELECTION
+  ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-2">
+
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <div class="signal-bars"><span></span><span></span><span></span><span></span></div>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+          <path d="M8 8.8a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 8 8.8Z" fill="currentColor"/>
+          <path d="M4.05 6.05a5.5 5.5 0 0 1 7.9 0l1.42-1.42a7.5 7.5 0 0 0-10.74 0L4.05 6.05Z" fill="currentColor"/>
+          <path d="M1.17 3.17a9.5 9.5 0 0 1 13.66 0l1.42-1.42A11.5 11.5 0 0 0-.25 1.75L1.17 3.17Z" fill="currentColor"/>
+        </svg>
+        <div class="battery">
+          <div class="battery-body"><div class="battery-fill"></div></div>
+          <div class="battery-cap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-back-btn" onclick="goTo(1)">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+          <path d="M8 1L1.5 7.5L8 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Back</span>
+      </button>
+      <span class="nav-title">Who were you with?</span>
+    </div>
+
+    <div class="content" style="gap:16px; padding:12px 16px; background:#f5f5f5;">
+
+      <!-- Suggested group -->
+      <div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span class="section-title">Suggested</span>
+          <span style="font-size:var(--body-sm-size); color:var(--on-surface-secondary);">Based on your pattern</span>
+        </div>
+
+        <div class="card" style="padding:0 var(--spacing-16);">
+          <div class="contact-row" onclick="toggleContact('sarah')" style="cursor:pointer;">
+            <div class="avatar" style="background:#5B8DD9;">S</div>
+            <div style="flex:1;">
+              <div class="contact-name">Sarah M.</div>
+              <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary);">Usually in your dinner group</div>
+            </div>
+            <div style="font-size:var(--body-sm-size); font-weight:600; color:var(--on-surface-secondary); margin-right:10px;">CHF 30</div>
+            <div class="checkmark selected" id="check-sarah">
+              <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+                <path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="divider" style="margin-left:56px; background:var(--border-weakest);"></div>
+          <div class="contact-row" onclick="toggleContact('marco')" style="cursor:pointer;">
+            <div class="avatar" style="background:#6B4FA0;">M</div>
+            <div style="flex:1;">
+              <div class="contact-name">Marco T.</div>
+              <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary);">Dined with you last 3 Saturdays</div>
+            </div>
+            <div style="font-size:var(--body-sm-size); font-weight:600; color:var(--on-surface-secondary); margin-right:10px;">CHF 30</div>
+            <div class="checkmark selected" id="check-marco">
+              <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+                <path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="divider" style="margin-left:56px; background:var(--border-weakest);"></div>
+          <div class="contact-row" onclick="toggleContact('lena')" style="cursor:pointer;">
+            <div class="avatar" style="background:#187A6C;">L</div>
+            <div style="flex:1;">
+              <div class="contact-name">Lena K.</div>
+              <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary);">In your frequent group</div>
+            </div>
+            <div style="font-size:var(--body-sm-size); font-weight:600; color:var(--on-surface-secondary); margin-right:10px;">CHF 30</div>
+            <div class="checkmark selected" id="check-lena">
+              <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+                <path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Others -->
+      <button class="card" style="display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer; border:none; width:100%;">
+        <div style="width:44px; height:44px; border-radius:1000px; background:var(--fills-tertiary); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; font-weight:300; color:var(--on-surface-secondary);">+</div>
+        <span style="font-size:var(--body-md-size); color:var(--brand-secondary); font-weight:500;">Add someone else...</span>
+      </button>
+
+      <!-- Summary chip -->
+      <div style="background:var(--fills-tertiary); border-radius:8px; padding:12px 16px; display:flex; align-items:center; gap:10px;">
+        <span style="font-size:16px;">💬</span>
+        <div>
+          <div style="font-size:var(--body-sm-size); font-weight:590; color:var(--on-surface);" id="split-summary">3 requests · CHF 30 each</div>
+          <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary); margin-top:1px;">They'll each see the Hiltl context</div>
+        </div>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <button class="btn-primary" onclick="goTo(3)">Continue → Add a moment</button>
+    </div>
+
+    <div class="bottom-safe"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 4 — ADD A MOMENT (message + tag)
+  ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-3">
+
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <div class="signal-bars"><span></span><span></span><span></span><span></span></div>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+          <path d="M8 8.8a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 8 8.8Z" fill="currentColor"/>
+          <path d="M4.05 6.05a5.5 5.5 0 0 1 7.9 0l1.42-1.42a7.5 7.5 0 0 0-10.74 0L4.05 6.05Z" fill="currentColor"/>
+          <path d="M1.17 3.17a9.5 9.5 0 0 1 13.66 0l1.42-1.42A11.5 11.5 0 0 0-.25 1.75L1.17 3.17Z" fill="currentColor"/>
+        </svg>
+        <div class="battery">
+          <div class="battery-body"><div class="battery-fill"></div></div>
+          <div class="battery-cap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-bar">
+      <button class="nav-back-btn" onclick="goTo(2)">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none">
+          <path d="M8 1L1.5 7.5L8 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Back</span>
+      </button>
+      <span class="nav-title">Add a Moment</span>
+    </div>
+
+    <div class="content" style="gap:16px; padding:12px 16px; background:#f5f5f5;">
+
+      <!-- Request summary -->
+      <div class="card" style="display:flex; align-items:center; gap:12px;">
+        <div style="display:flex;">
+          <div style="width:32px; height:32px; border-radius:1000px; background:#5B8DD9; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:700; border:2px solid white; z-index:3; position:relative;">S</div>
+          <div style="width:32px; height:32px; border-radius:1000px; background:#6B4FA0; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:700; border:2px solid white; margin-left:-10px; z-index:2; position:relative;">M</div>
+          <div style="width:32px; height:32px; border-radius:1000px; background:#187A6C; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:700; border:2px solid white; margin-left:-10px; z-index:1; position:relative;">L</div>
+        </div>
+        <div>
+          <div style="font-size:var(--body-md-size); font-weight:590; color:var(--on-surface);">3 requests · CHF 30 each</div>
+          <div style="font-size:var(--body-sm-size); color:var(--on-surface-secondary); margin-top:1px;">Sarah, Marco, Lena</div>
+        </div>
+      </div>
+
+      <!-- Tag -->
+      <div>
+        <div style="font-size:var(--body-sm-size); font-weight:590; color:var(--on-surface-secondary); margin-bottom:10px;">Tag</div>
+        <div class="tag-row">
+          <button class="tag-pill active" id="tag-dinner" onclick="selectTag('dinner')">🍕 Dinner</button>
+          <button class="tag-pill" id="tag-hike" onclick="selectTag('hike')">🏔 Hike</button>
+          <button class="tag-pill" id="tag-birthday" onclick="selectTag('birthday')">🎂 Birthday</button>
+          <button class="tag-pill" id="tag-shared" onclick="selectTag('shared')">🏠 Shared</button>
+          <button class="tag-pill" id="tag-coffee" onclick="selectTag('coffee')">☕ Coffee</button>
+        </div>
+      </div>
+
+      <!-- Message -->
+      <div>
+        <div style="font-size:var(--body-sm-size); font-weight:590; color:var(--on-surface-secondary); margin-bottom:10px;">Message <span style="font-weight:400; color:var(--on-surface-secondary); opacity:0.6;">— auto-suggested</span></div>
+        <textarea class="msg-input" rows="2" id="moment-msg">Such a great evening! 🍝</textarea>
+      </div>
+
+      <!-- Privacy note -->
+      <div class="info-note">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:1px;">
+          <circle cx="8" cy="8" r="7" stroke="var(--on-surface-secondary)" stroke-width="1.2"/>
+          <path d="M8 7V11" stroke="var(--on-surface-secondary)" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="8" cy="5" r="0.8" fill="var(--on-surface-secondary)"/>
+        </svg>
+        <span>Your contacts see the tag, amount, and restaurant — not your full receipt or balance. Processed on-device.</span>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn-primary" onclick="goTo(4)">Send 3 requests</button>
+        <button class="btn-link" onclick="goTo(4)">Skip — send without message</button>
+      </div>
+    </div>
+
+    <div class="bottom-safe"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 5 — SUCCESS: Moment sent
+  ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-4">
+
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <div class="signal-bars"><span></span><span></span><span></span><span></span></div>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+          <path d="M8 8.8a1.2 1.2 0 1 1 0 2.4A1.2 1.2 0 0 1 8 8.8Z" fill="currentColor"/>
+          <path d="M4.05 6.05a5.5 5.5 0 0 1 7.9 0l1.42-1.42a7.5 7.5 0 0 0-10.74 0L4.05 6.05Z" fill="currentColor"/>
+          <path d="M1.17 3.17a9.5 9.5 0 0 1 13.66 0l1.42-1.42A11.5 11.5 0 0 0-.25 1.75L1.17 3.17Z" fill="currentColor"/>
+        </svg>
+        <div class="battery">
+          <div class="battery-body"><div class="battery-fill"></div></div>
+          <div class="battery-cap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content" style="gap:20px; padding:32px 16px 12px; align-items:center; background:white;">
+
+      <!-- Success animation -->
+      <div class="success-check" id="success-check">
+        <svg width="32" height="24" viewBox="0 0 32 24" fill="none">
+          <path d="M2 12L11.5 22L30 2" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- Summary text -->
+      <div style="text-align:center; display:flex; flex-direction:column; gap:6px;" class="anim-fade-up">
+        <div style="font-size:var(--heading-2xl-size); font-weight:700; color:var(--on-surface); line-height:1.15;">3 Moments sent</div>
+        <div style="font-size:var(--body-md-size); color:var(--on-surface-secondary);">CHF 30 each · 🍕 Dinner at Hiltl</div>
+      </div>
+
+      <!-- Recipient preview -->
+      <div style="width:100%; display:flex; flex-direction:column; gap:8px;" class="anim-fade-up anim-delay-1">
+        <div style="font-size:var(--body-sm-size); font-weight:590; color:var(--on-surface-secondary);">What Sarah sees</div>
+        <div class="moment-preview">
+          <div class="moment-from">Dragos sent you a Moment</div>
+          <div class="moment-bubble">
+            <div class="moment-amount">CHF 30.00</div>
+            <div class="moment-tag">🍕 Dinner at Hiltl</div>
+            <div class="moment-msg">"Such a great evening! 🍝"</div>
+          </div>
+          <div class="moment-settle">
+            <button class="settle-btn">Settle up ↗</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy note -->
+      <div class="info-note anim-fade-up anim-delay-2" style="width:100%;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0; margin-top:1px;">
+          <path d="M7 1L2 3.5V7c0 2.76 2.12 5.3 5 5.9C9.88 12.3 12 9.76 12 7V3.5L7 1Z" stroke="var(--on-surface-secondary)" stroke-width="1.1"/>
+        </svg>
+        <span>Processed on-device · visible only to Sarah, Marco, and Lena · no social feed</span>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <button class="btn-primary" onclick="goTo(0)" style="width:100%;">Done</button>
+    </div>
+
+    <div class="bottom-safe"></div>
+  </div>
+
+</div>
+
+<script>
+  // ── Screen navigation
+  function goTo(n) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const next = document.getElementById('screen-' + n);
+    next.classList.add('active');
+
+    // Restart animations on screen 1 (signals)
+    if (n === 1) {
+      const items = next.querySelectorAll('.anim-fade-up');
+      items.forEach(el => {
+        el.style.animation = 'none';
+        el.offsetHeight; // reflow
+        el.style.animation = '';
+      });
+    }
+
+    // Restart success animation on screen 4
+    if (n === 4) {
+      const check = document.getElementById('success-check');
+      check.style.animation = 'none';
+      check.offsetHeight;
+      check.style.animation = '';
+    }
+  }
+
+  // ── Contact toggle
+  const selected = { sarah: true, marco: true, lena: true };
+
+  function toggleContact(id) {
+    selected[id] = !selected[id];
+    const check = document.getElementById('check-' + id);
+    if (selected[id]) {
+      check.classList.add('selected');
+    } else {
+      check.classList.remove('selected');
+      check.innerHTML = '';
+    }
+    if (!selected[id]) {
+      check.innerHTML = '';
+    } else {
+      check.innerHTML = '<svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    updateSplitSummary();
+  }
+
+  function updateSplitSummary() {
+    const count = Object.values(selected).filter(Boolean).length;
+    const el = document.getElementById('split-summary');
+    if (count === 0) {
+      el.textContent = 'Select at least one contact';
+    } else {
+      const amt = (120 / (count + 1)).toFixed(2).replace('.', '.');
+      el.textContent = count + ' request' + (count > 1 ? 's' : '') + ' · CHF ' + amt + ' each';
+    }
+  }
+
+  // ── Tag selection
+  const tags = ['dinner', 'hike', 'birthday', 'shared', 'coffee'];
+  let activeTag = 'dinner';
+
+  function selectTag(id) {
+    tags.forEach(t => {
+      document.getElementById('tag-' + t).classList.remove('active');
+    });
+    document.getElementById('tag-' + id).classList.add('active');
+    activeTag = id;
+  }
+</script>
+</body>
+</html>

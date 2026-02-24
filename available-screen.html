@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=393, initial-scale=1.0" />
+  <title>Cashback-Angebote – Verfügbar</title>
+  <style>
+    /* ── Design tokens ─────────────────────────────────── */
+    :root {
+      --surface:                    #ffffff;
+      --surface-inverse:            #171717;
+      --on-surface:                 #262626;
+      --on-surface-secondary:       #525252;
+      --on-surface-tertiary:        #a3a3a3;
+      --on-surface-inverse:         #ffffff;
+      --labels-vibrant-primary:     #1a1a1a;
+      --labels-vibrant-secondary:   #727272;
+      --labels-primary:             #000000;
+      --fills-tertiary:             rgba(118,118,128,0.12);
+      --seg-selected-fill:          #ffffff;
+      --accents-blue:               #0088ff;
+      --shadow-sm:                  0px 0px 4px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.16);
+      --font: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #e5e5ea;
+      display: flex;
+      justify-content: center;
+      padding: 32px 0 64px;
+      min-height: 100vh;
+    }
+
+    /* ── Frame: 393 × 852px fixed, mirrors Figma canvas ── */
+    .frame {
+      width: 393px;
+      height: 852px;
+      background: var(--surface);
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+      flex-shrink: 0;
+    }
+
+    /* ─────────────────────────────────────────────────────
+       STATUS BAR  (h=54, y=0)
+    ───────────────────────────────────────────────────── */
+    .status-bar {
+      position: absolute;
+      left: 0; top: 0; width: 393px; height: 54px;
+      background: var(--surface);
+    }
+    .status-time {
+      position: absolute;
+      left: 0; top: 50%; transform: translateY(-50%);
+      width: 36%; /* left 64.25% right → left portion ~35.75% */
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 17px;
+      line-height: 22px;
+      color: #000;
+      text-align: center;
+    }
+    .status-icons {
+      position: absolute;
+      right: 16px; top: 50%; transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .status-icons img { display: block; }
+
+    /* ─────────────────────────────────────────────────────
+       TOP NAV BAR  (h=54, y=54)
+    ───────────────────────────────────────────────────── */
+    .nav-bar {
+      position: absolute;
+      left: 0; top: 54px; width: 393px; height: 54px;
+      background: var(--surface);
+      display: flex;
+      align-items: flex-end;
+      padding: 0 16px 10px;
+    }
+
+    /* Close button (leading) */
+    .nav-close-btn {
+      width: 44px; height: 44px;
+      border-radius: 296px;
+      background: var(--fills-tertiary);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .nav-close-btn svg { display: block; }
+
+    /* URL label centred */
+    .nav-url {
+      position: absolute;
+      left: 50%; top: 50%; transform: translate(-50%, -50%) translateY(calc(-10px / 2));
+      margin-top: -5px; /* optical — matches pb-10px on bar */
+      font-family: var(--font);
+      font-weight: 400;
+      font-size: 17px;
+      line-height: 22px;
+      color: var(--on-surface);
+      white-space: nowrap;
+    }
+
+    /* Share button (trailing) */
+    .nav-share-btn {
+      margin-left: auto;
+      width: 36px; height: 36px;
+      border-radius: 100px;
+      background: var(--accents-blue);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 2px rgba(0,0,0,0.1), 0 1px 8px rgba(0,0,0,0.12);
+    }
+
+    /* ─────────────────────────────────────────────────────
+       CONTENT AREA  (y=108, scrollable)
+    ───────────────────────────────────────────────────── */
+    .content {
+      position: absolute;
+      left: 0; top: 108px;
+      width: 393px;
+      /* visible height to bottom toolbar top ~764 → 656px */
+      height: 656px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* hide scrollbar visually */
+      scrollbar-width: none;
+    }
+    .content::-webkit-scrollbar { display: none; }
+
+    /* inner padding wrapper */
+    .content-inner {
+      padding: 12px 16px 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Title block ── */
+    .title-block { display: flex; flex-direction: column; gap: 0; }
+    .large-title {
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 34px;
+      line-height: 41px;
+      letter-spacing: 0.4px;
+      color: var(--labels-vibrant-primary);
+    }
+    .subtitle {
+      font-family: var(--font);
+      font-weight: 500;
+      font-size: 15px;
+      line-height: 20px;
+      letter-spacing: -0.25px;
+      color: var(--labels-vibrant-secondary);
+    }
+
+    /* ── Segmented control ── */
+    .seg-control {
+      width: 361px;
+      height: 32px;
+      background: var(--fills-tertiary);
+      border-radius: 100px;
+      display: flex;
+      align-items: center;
+      padding: 2px;
+      gap: 0;
+    }
+    .seg-btn {
+      flex: 1;
+      height: 100%;
+      border-radius: 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 13.333px;
+      line-height: 18px;
+      letter-spacing: -0.08px;
+      color: var(--labels-primary);
+      text-align: center;
+      padding: 3px 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .seg-btn.active {
+      background: var(--seg-selected-fill);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .seg-btn:not(.active) { font-weight: 500; }
+
+    /* ── Search row ── */
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 361px;
+    }
+    .search-bar {
+      flex: 1;
+      height: 36px;
+      background: var(--fills-tertiary);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 7px 8px;
+      gap: 4px;
+    }
+    .search-icon {
+      font-family: var(--font);
+      font-size: 17px;
+      line-height: 22px;
+      color: rgba(60,60,67,0.6);
+      width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .search-placeholder {
+      font-family: var(--font);
+      font-weight: 400;
+      font-size: 17px;
+      line-height: 22px;
+      letter-spacing: -0.4px;
+      color: rgba(60,60,67,0.6);
+    }
+    .filter-btn {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      background: var(--surface);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+
+    /* ── Card grid ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: 172.5px 172.5px;
+      gap: 16px;
+      width: 361px;
+    }
+
+    /* ── Single card ── */
+    .card {
+      width: 172.5px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* card hero image */
+    .card-img {
+      width: 100%;
+      height: 98px;
+      object-fit: cover;
+      display: block;
+      flex-shrink: 0;
+    }
+
+    /* brand logo circle — absolute, overlaps hero/body boundary */
+    .card-logo {
+      position: absolute;
+      left: 12px;
+      top: 42px; /* 98 - 48/2 - ~14 ≈ matches Figma top:42.02px */
+      width: 48px; height: 48px;
+      border-radius: 100px;
+      background: white;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+      z-index: 2;
+    }
+    .card-logo img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+      border-radius: 100px;
+    }
+
+    /* CHF label chip — absolute top-right */
+    .label-chip {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: var(--surface-inverse);
+      color: var(--on-surface-inverse);
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 15px;
+      line-height: 20px;
+      letter-spacing: -0.23px;
+      padding: 2px 4px;
+      border-radius: 2px;
+      z-index: 2;
+    }
+
+    /* card body */
+    .card-body {
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      padding: 12px;
+      width: 100%;
+    }
+
+    .card-texts {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    /* brand name + category row */
+    .card-brand-block { display: flex; flex-direction: column; width: 100%; }
+
+    .card-brand-name {
+      font-family: var(--font);
+      font-weight: 590; /* SF Pro Semibold */
+      font-size: 15px;
+      line-height: 20px;
+      letter-spacing: -0.23px;
+      color: var(--on-surface);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-category {
+      font-family: var(--font);
+      font-weight: 590;
+      font-size: 10px;
+      line-height: 13px;
+      letter-spacing: 0.06px;
+      color: var(--on-surface-tertiary);
+      text-transform: uppercase;
+    }
+
+    /* icon + text detail rows */
+    .card-detail {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+      width: 100%;
+    }
+    .card-detail-icon {
+      width: 16px; height: 16px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card-detail-icon img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .card-detail-text {
+      font-family: var(--font);
+      font-weight: 400;
+      font-size: 13px;
+      line-height: 18px;
+      letter-spacing: -0.08px;
+      color: var(--on-surface-secondary);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* activate button */
+    .card-btn {
+      width: 100%;
+      min-height: 32px;
+      border: 1px solid var(--on-surface-secondary);
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 13px;
+      line-height: 18px;
+      letter-spacing: -0.08px;
+      color: var(--on-surface);
+      text-align: center;
+      padding: 7px 16px;
+    }
+
+    /* ─────────────────────────────────────────────────────
+       BOTTOM TOOLBAR  (position fixed within frame)
+       Figma: y=764, h=88, x=-4.5, w=402
+    ───────────────────────────────────────────────────── */
+    .bottom-toolbar {
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 393px;
+      height: 88px;
+      padding: 4px 16px 36px;
+      background: rgba(249,249,249,0.94);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 0.5px solid rgba(0,0,0,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .toolbar-group { display: flex; align-items: center; gap: 0; }
+    .toolbar-btn {
+      width: 48px; height: 48px;
+      border-radius: 296px;
+      border: none; cursor: pointer;
+      background: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .toolbar-btn svg { display: block; }
+  </style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ── Status bar ── -->
+  <div class="status-bar">
+    <span class="status-time">9:41</span>
+    <div class="status-icons">
+      <!-- Cellular: real Figma asset -->
+      <img src="https://www.figma.com/api/mcp/asset/4cbf29fb-3f54-406a-99e4-bdc33fcbccad"
+           width="19" height="13" alt="cellular" />
+      <!-- Wifi: real Figma asset -->
+      <img src="https://www.figma.com/api/mcp/asset/cdc4fc48-02b9-479b-8d23-b1117cfd814d"
+           width="17" height="13" alt="wifi" />
+      <!-- Battery border + fill (CSS) + cap asset -->
+      <div style="position:relative;width:27px;height:14px;">
+        <div style="position:absolute;left:0;top:1px;width:24px;height:12px;border:1.5px solid rgba(0,0,0,0.35);border-radius:4.3px;"></div>
+        <div style="position:absolute;left:2px;top:3px;width:20px;height:8px;background:#000;border-radius:2.5px;"></div>
+        <img src="https://www.figma.com/api/mcp/asset/7d3a7bd2-3d07-4013-8206-bcaff6983509"
+             style="position:absolute;right:0;top:4.5px;width:1.5px;height:5px;" alt="" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Top nav bar ── -->
+  <div class="nav-bar">
+    <!-- Close X button -->
+    <button class="nav-close-btn" aria-label="Schließen">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M1 1L13 13M13 1L1 13" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <!-- Centred URL -->
+    <span class="nav-url">cashback.twint.ch</span>
+
+    <!-- Share button -->
+    <button class="nav-share-btn" aria-label="Teilen">
+      <svg width="15" height="17" viewBox="0 0 15 17" fill="none">
+        <path d="M7.5 11V1M7.5 1L4 4.5M7.5 1L11 4.5"
+              stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1 12V14.5C1 15.3 1.7 16 2.5 16H12.5C13.3 16 14 15.3 14 14.5V12"
+              stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ── Scrollable content ── -->
+  <div class="content">
+    <div class="content-inner">
+
+      <!-- Title -->
+      <div class="title-block">
+        <h1 class="large-title">Cashback-Angebote</h1>
+        <p class="subtitle">Entdecke exklusive Deals und erhalte Cashback</p>
+      </div>
+
+      <!-- Segmented control -->
+      <div class="seg-control" role="tablist">
+        <button class="seg-btn active" role="tab">Verfügbar</button>
+        <button class="seg-btn"        role="tab">Aktiv</button>
+        <button class="seg-btn"        role="tab">Eingelöst</button>
+      </div>
+
+      <!-- Search + filter -->
+      <div class="search-row">
+        <div class="search-bar">
+          <span class="search-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="6.5" cy="6.5" r="5" stroke="rgba(60,60,67,0.6)" stroke-width="1.5"/>
+              <path d="M10.5 10.5L14 14" stroke="rgba(60,60,67,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="search-placeholder">Search</span>
+        </div>
+        <button class="filter-btn" aria-label="Filter">
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+            <rect y="0"    width="16" height="1.5" rx="0.75" fill="#262626"/>
+            <rect x="2.5" y="4.25" width="11" height="1.5" rx="0.75" fill="#262626"/>
+            <rect x="5.5" y="8.5"  width="5"  height="1.5" rx="0.75" fill="#262626"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Card grid — 6 cards, real Figma images & logos -->
+      <div class="card-grid">
+
+        <!-- Card 1: 305:5584 top-left -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/1d873b04-7aec-46aa-a807-9c07dfda0123"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/377c5996-bb4b-49e8-8bac-3b7b7fae6b73" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/a461305f-2a70-41c3-99ff-ce84192bac84" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/15552181-704f-4e26-ace9-0c41891e1e66" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+        <!-- Card 2: 305:5371 top-right -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/95f33597-d32c-4c71-97a8-863d7d735b32"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/5e00d80b-84f2-452b-9983-dca0a029d87f" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/4862d4fc-4394-477c-9be4-1b98875d8537" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/e1ef271d-ea61-491a-93bb-0e92ad02e717" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+        <!-- Card 3: 305:5402 -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/fa0fd051-3816-44d4-8801-c59dbd9d8c70"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/0f6eacfb-dcc7-4748-ad29-b7d1c47a5986" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/9eb541c2-0d2b-450a-945a-80d89db9bcf1" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/cf062727-5881-4969-981d-b17905ad6e06" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+        <!-- Card 4: 305:5432 -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/2cb049d0-b802-4f94-9c63-c7254bf9f7bf"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/c18e7a12-1187-4bd4-b45a-a1eb5ce90926" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/4fab1f07-8ca2-4f08-85bb-4581040aeb23" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/7c986801-3d21-46c3-a113-9efd89b106f9" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+        <!-- Card 5: 305:5462 -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/4d65b0df-4afe-4444-b23b-e54c2c490df6"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/a7bde81e-305b-4ed1-b04e-c0d6c0bdd8a9" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/23b3a3fb-899f-4d7c-9f01-bd142037ca11" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/30c6845d-2eaf-4da5-a99e-ea8531a32b7d" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+        <!-- Card 6: 305:5492 -->
+        <div class="card">
+          <img class="card-img"
+               src="https://www.figma.com/api/mcp/asset/c0ab1d3c-7f2a-4451-93e5-53a7494ce630"
+               alt="Tranza Zürich" />
+          <div class="card-logo">
+            <img src="https://www.figma.com/api/mcp/asset/d15f3a7a-fff8-4f1b-aa13-b3b61f55687d" alt="logo" />
+          </div>
+          <span class="label-chip">CHF 10</span>
+          <div class="card-body">
+            <div class="card-texts">
+              <div class="card-brand-block">
+                <span class="card-brand-name">Tranza Zürich</span>
+                <span class="card-category">Sport &amp; Outdoor</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/8fe7be4a-415e-4c70-9641-beb5faf4a22d" alt="" />
+                </div>
+                <span class="card-detail-text">Online &amp; Vor Ort</span>
+              </div>
+              <div class="card-detail">
+                <div class="card-detail-icon">
+                  <img src="https://www.figma.com/api/mcp/asset/09a0e394-47bf-4b05-a931-88d0f78aa2bb" alt="" />
+                </div>
+                <span class="card-detail-text">Gültig bis 31.12</span>
+              </div>
+            </div>
+            <button class="card-btn">Jetzt aktivieren</button>
+          </div>
+        </div>
+
+      </div><!-- /card-grid -->
+    </div><!-- /content-inner -->
+  </div><!-- /content -->
+
+  <!-- ── Bottom toolbar ── -->
+  <div class="bottom-toolbar">
+    <!-- Leading group: back, share, more -->
+    <div class="toolbar-group">
+      <button class="toolbar-btn" aria-label="Zurück">
+        <svg width="11" height="18" viewBox="0 0 11 18" fill="none">
+          <path d="M9.5 1.5L2 9L9.5 16.5"
+                stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="toolbar-btn" aria-label="Teilen">
+        <svg width="18" height="22" viewBox="0 0 18 22" fill="none">
+          <path d="M9 14V2M9 2L5 6M9 2L13 6"
+                stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M1 16V19C1 20.1 1.9 21 3 21H15C16.1 21 17 20.1 17 19V16"
+                stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="toolbar-btn" aria-label="Mehr">
+        <svg width="20" height="4" viewBox="0 0 20 4" fill="none">
+          <circle cx="2"  cy="2" r="2" fill="#1a1a1a"/>
+          <circle cx="10" cy="2" r="2" fill="#1a1a1a"/>
+          <circle cx="18" cy="2" r="2" fill="#1a1a1a"/>
+        </svg>
+      </button>
+    </div>
+    <!-- Trailing group: bookmark, tabs, forward -->
+    <div class="toolbar-group">
+      <button class="toolbar-btn" aria-label="Lesezeichen">
+        <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+          <path d="M1 1H13V17L7 13L1 17V1Z"
+                stroke="#1a1a1a" stroke-width="1.8" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="toolbar-btn" aria-label="Tabs">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="5" width="12" height="12" rx="2"
+                stroke="#1a1a1a" stroke-width="1.8"/>
+          <path d="M5 5V3C5 1.9 5.9 1 7 1H15C16.1 1 17 1.9 17 3V11C17 12.1 16.1 13 15 13H13"
+                stroke="#1a1a1a" stroke-width="1.8"/>
+        </svg>
+      </button>
+      <button class="toolbar-btn" aria-label="Vorwärts">
+        <svg width="11" height="18" viewBox="0 0 11 18" fill="none">
+          <path d="M1.5 1.5L9 9L1.5 16.5"
+                stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /frame -->
+
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+</body>
+</html>

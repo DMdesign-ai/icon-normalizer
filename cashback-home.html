@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=393, initial-scale=1.0" />
+  <title>Cashback — Home</title>
+  <style>
+    /* ─────────────────────────────────────────
+       FIGMA DESIGN TOKENS
+       Source: GlxMr2W1ltdGgIBhK8eqf1 / node 418-7107
+    ───────────────────────────────────────── */
+    :root {
+      /* Surface */
+      --surface:           #ffffff;
+      --surface-inverse:   #171717;
+      --surface-variant2:  #f5f5f5;
+      --app-surface:       #f5f5f5;
+
+      /* On Surface */
+      --on-surface:            #262626;
+      --on-surface-secondary:  #525252;
+      --on-surface-quaternary: #d4d4d4;
+      --on-surface-inverse:    #ffffff;
+
+      /* Brand */
+      --brand-primary:    #262626;
+      --brand-secondary:  #007aff;
+      --brand-on-primary: #ffffff;
+      --brand-success:    #4caf50;
+
+      /* Fills */
+      --fills-tertiary: rgba(118, 118, 128, 0.12);
+
+      /* Outline */
+      --outline-weak:    #d3e3fd;
+      --outline-divider: #d4d4d4;
+
+      /* Border Radius */
+      --radius-sm:     6px;   /* --p-border-radius-150 — buttons, P2P */
+      --radius-md:     8px;   /* --p-border-radius-100 — cards */
+      --radius-full:   99999px;
+      --radius-circle: 1000px;
+
+      /* Spacing */
+      --space-2:  2px;
+      --space-4:  4px;
+      --space-8:  8px;
+      --space-12: 12px;
+      --space-16: 16px;
+      --space-24: 24px;
+      --inset-sm: 16px;
+
+      /* Typography */
+      --font: "SF Pro", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+
+      /* body-sm: 13px / -0.08px / 18px */
+      --text-sm-size: 13px; --text-sm-lh: 18px; --text-sm-ls: -0.08px;
+      /* body-md: 15px / -0.23px / 20px */
+      --text-md-size: 15px; --text-md-lh: 20px; --text-md-ls: -0.23px;
+      /* body-lg: 17px / -0.43px / 22px */
+      --text-lg-size: 17px; --text-lg-lh: 22px; --text-lg-ls: -0.43px;
+      /* heading-md: 17px / -0.43px / 22px, weight 590 */
+      --heading-md-size: 17px; --heading-md-lh: 22px; --heading-md-ls: -0.43px;
+      /* heading-lg: 20px / -0.45px / 25px, weight 700 */
+      --heading-lg-size: 20px; --heading-lg-lh: 25px; --heading-lg-ls: -0.45px;
+
+      /* Shadow */
+      --shadow-card: 0px 1px 2px 0px rgba(0, 0, 0, 0.04);
+    }
+
+    /* ─── Reset ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      background: #1c1c1e;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Multi-screen system ─── */
+    .phone {
+      width: 393px; height: 852px;
+      background: var(--app-surface);
+      border-radius: 54px;
+      overflow: hidden;
+      position: relative;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08),
+        0 40px 100px rgba(0,0,0,0.7),
+        inset 0 0 0 1px rgba(0,0,0,0.15);
+    }
+
+    .screen {
+      display: none; flex-direction: column;
+      width: 100%; height: 100%;
+    }
+    .screen.active { display: flex; }
+
+    /* ─────────────────────────────────────────
+       REUSABLE COMPONENTS
+    ───────────────────────────────────────── */
+
+    /* Status Bar */
+    .status-bar {
+      height: 54px;
+      background: var(--surface);
+      display: flex; align-items: flex-end;
+      justify-content: space-between;
+      padding: 0 24px 12px;
+      flex-shrink: 0;
+    }
+    .status-time {
+      font-size: var(--text-lg-size); font-weight: 600;
+      line-height: var(--text-lg-lh); letter-spacing: -0.43px;
+      color: var(--on-surface);
+    }
+    .status-icons { display: flex; align-items: center; gap: 6px; }
+
+    /* Nav Bar — home style (centered balance) */
+    .nav-bar-home {
+      height: 42px;
+      background: var(--surface);
+      position: relative;
+      display: flex; align-items: center;
+      padding: 0 var(--inset-sm);
+      flex-shrink: 0;
+    }
+    .nav-bar-home::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 0.5px; background: var(--outline-weak);
+    }
+    .nav-center {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: var(--space-8);
+    }
+    .nav-balance {
+      font-size: var(--heading-md-size); font-weight: 590;
+      line-height: var(--heading-md-lh); letter-spacing: var(--heading-md-ls);
+      color: var(--on-surface); white-space: nowrap;
+    }
+    .nav-menu {
+      position: absolute; right: 0;
+      height: 42px;
+      display: flex; align-items: center;
+      padding: 8px 16px 8px 8px;
+    }
+
+    /* Nav Bar — back style (iOS blue chevron) */
+    .nav-bar-back {
+      height: 44px;
+      background: var(--surface);
+      position: relative;
+      display: flex; align-items: center;
+      padding: 0 var(--inset-sm);
+      flex-shrink: 0;
+    }
+    .nav-bar-back::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 0.5px; background: #a8a8a8;
+    }
+    .nav-back-btn {
+      display: flex; align-items: center; gap: 4px;
+      background: none; border: none; cursor: pointer; padding: 0;
+      color: var(--brand-secondary);
+      font-size: var(--text-lg-size); font-weight: 400;
+      line-height: var(--text-lg-lh); letter-spacing: var(--text-lg-ls);
+    }
+    .nav-title {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: var(--heading-md-size); font-weight: 590;
+      line-height: var(--heading-md-lh); letter-spacing: var(--heading-md-ls);
+      color: var(--on-surface);
+    }
+
+    /* Scrollable content */
+    .content {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      background: var(--app-surface);
+      padding: var(--space-12) var(--inset-sm) var(--space-16);
+      display: flex; flex-direction: column; gap: var(--space-16);
+      -webkit-overflow-scrolling: touch;
+    }
+    .content::-webkit-scrollbar { display: none; }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center;
+      gap: 16px; height: 20px;
+      margin-bottom: var(--space-8);
+    }
+    .section-title {
+      flex: 1;
+      font-size: var(--text-sm-size); font-weight: 590;
+      line-height: var(--text-sm-lh); letter-spacing: var(--text-sm-ls);
+      color: var(--on-surface);
+    }
+    .section-action {
+      font-size: var(--text-sm-size); font-weight: 590;
+      line-height: var(--text-sm-lh); letter-spacing: var(--text-sm-ls);
+      color: var(--brand-secondary);
+      background: none; border: none; cursor: pointer; padding: 0;
+    }
+
+    /* Primary button */
+    .btn-primary {
+      width: 100%; min-height: 56px;
+      background: var(--brand-primary);
+      color: var(--brand-on-primary);
+      border-radius: var(--radius-sm);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      gap: var(--space-12);
+      padding: var(--space-12) var(--space-24);
+    }
+    .btn-primary-label {
+      font-size: var(--text-lg-size); font-weight: 590;
+      line-height: var(--text-lg-lh); letter-spacing: var(--text-lg-ls);
+    }
+
+    /* Home indicator */
+    .home-indicator {
+      height: 21px;
+      background: var(--app-surface);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .home-pill {
+      width: 139px; height: 5px;
+      background: rgba(0,0,0,0.2);
+      border-radius: var(--radius-full);
+    }
+
+    /* Divider */
+    .divider {
+      height: 0.5px;
+      background: var(--outline-divider);
+    }
+
+    /* Info note */
+    .info-note {
+      background: var(--fills-tertiary);
+      border-radius: var(--radius-md);
+      padding: var(--space-12) var(--space-16);
+      font-size: var(--text-sm-size);
+      line-height: var(--text-sm-lh);
+      letter-spacing: var(--text-sm-ls);
+      color: var(--on-surface-secondary);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Figma asset URLs (expire 7 days from session) -->
+<script>
+  const ICONS = {
+    /* nav */
+    add:       "https://www.figma.com/api/mcp/asset/95398cf9-705a-494e-bc85-5991627f76e5",
+    more:      "https://www.figma.com/api/mcp/asset/428bc379-a7fd-4219-b8ad-ce2222572bdc",
+    /* status bar */
+    wifi:      "https://www.figma.com/api/mcp/asset/cccb4888-67da-46fc-84cc-eb62de4a2b62",
+    cellular:  "https://www.figma.com/api/mcp/asset/961f9464-5a28-4c06-9b45-8f7be9c8f2b3",
+    batteryCap:"https://www.figma.com/api/mcp/asset/9aaa2456-2ea6-4286-bd62-0b7d8edd91c4",
+    /* spotlight close */
+    close:     "https://www.figma.com/api/mcp/asset/5e0af097-3877-405c-bb27-db0572afcd14",
+    /* transaction */
+    account:   "https://www.figma.com/api/mcp/asset/57cbd761-fa1d-4e65-80a3-781078ef7cb3",
+    /* partner functions */
+    superdeals:"https://www.figma.com/api/mcp/asset/2b8f7830-3723-45d1-94cd-5d5f7e33903e",
+    parking:   "https://www.figma.com/api/mcp/asset/ff35dd9b-8ef8-4a97-b034-c92559a2d34a",
+    spinwin:   "https://www.figma.com/api/mcp/asset/f1cb09ff-f1db-430e-acc8-3a43ec3bd673",
+    cashbackBorder: "https://www.figma.com/api/mcp/asset/7c7a7868-495b-4294-bc02-d0d494f1c8af",
+    cashbackChf:    "https://www.figma.com/api/mcp/asset/91bb089b-2958-4bc4-abf2-007bf10d1618",
+    cashbackArrow:  "https://www.figma.com/api/mcp/asset/93c7637f-c4b1-4de3-97b7-1094fd89d233",
+    /* P2P */
+    send:      "https://www.figma.com/api/mcp/asset/6c3fe0a8-84c9-43e0-b298-82ef698ca0bd",
+    request:   "https://www.figma.com/api/mcp/asset/07cc287b-1309-40c1-bea3-ee24cf568d17",
+    /* pay */
+    pay:       "https://www.figma.com/api/mcp/asset/ece724fb-2ae0-4aef-a52e-bd1ff6fa50ef",
+  };
+
+  function injectIcons() {
+    document.querySelectorAll('[data-icon]').forEach(el => {
+      const key = el.dataset.icon;
+      if (ICONS[key]) {
+        const img = document.createElement('img');
+        img.src = ICONS[key];
+        img.style.cssText = 'display:block; width:100%; height:100%; object-fit:contain;';
+        img.alt = '';
+        el.appendChild(img);
+      }
+    });
+
+    /* Cashback icon — 3 layered images in 46×30 container
+       Inset percentages converted to exact px so images don't overflow */
+    const cb = document.getElementById('cashback-icon');
+    if (cb) {
+      const W = 46, H = 30;
+      const layers = [
+        { src: ICONS.cashbackBorder, t: H*-0.0167, r: W*-0.0078, b: H*-0.0225, l: W*-0.0084 },
+        { src: ICONS.cashbackChf,    t: H*0.3477,  r: W*0.2406,  b: H*0.3098,  l: W*0.1686  },
+        { src: ICONS.cashbackArrow,  t: H*0.5619,  r: W*-0.0062, b: H*-0.0227, l: W*0.7486  },
+      ];
+      layers.forEach(({ src, t, r, b, l }) => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '';
+        const w = Math.round(W - l - r);
+        const h = Math.round(H - t - b);
+        img.style.cssText = `position:absolute;left:${Math.round(l)}px;top:${Math.round(t)}px;width:${w}px;height:${h}px;display:block;`;
+        cb.appendChild(img);
+      });
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', injectIcons);
+</script>
+
+<div class="phone">
+
+  <!-- ═══════════════════════════════════
+       SCREEN 0 — Home
+       Source: GlxMr2W1ltdGgIBhK8eqf1, node 418-7107
+  ═══════════════════════════════════ -->
+  <div class="screen active" id="screen-0">
+
+    <!-- Status Bar (h=54px) -->
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <!-- Cellular — Figma asset imgCellularConnection -->
+        <div style="position:relative; width:19.2px; height:12px;">
+          <div data-icon="cellular" style="position:absolute; inset:0;"></div>
+        </div>
+        <!-- WiFi — Figma asset imgWifi -->
+        <div style="position:relative; width:17.1px; height:12px;">
+          <div data-icon="wifi" style="position:absolute; inset:0;"></div>
+        </div>
+        <!-- Battery — CSS (matching Figma HTML structure) -->
+        <div style="position:relative; width:25px; height:12px;">
+          <div style="position:absolute; inset:0; border:1px solid black; border-radius:4.3px; opacity:0.35;"></div>
+          <div style="position:absolute; top:2px; left:2px; right:4px; bottom:2px; background:black; border-radius:2.5px;"></div>
+          <!-- cap -->
+          <div style="position:absolute; right:-1.5px; top:4px; bottom:4px; width:1.5px; background:rgba(0,0,0,0.4);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav Bar (h=42px, balance centered, add icon, more icon) -->
+    <div class="nav-bar-home">
+      <div class="nav-center">
+        <span class="nav-balance">CHF 120.00</span>
+        <!-- Add — Figma asset imgVector3, 16×16 -->
+        <div style="position:relative; width:16px; height:16px; overflow:hidden; flex-shrink:0;">
+          <div data-icon="add" style="position:absolute; inset:12.5% 12.51%;"></div>
+        </div>
+      </div>
+      <!-- More — Figma asset imgVector4, 24×24 -->
+      <div class="nav-menu">
+        <div style="position:relative; width:24px; height:24px; overflow:hidden; flex-shrink:0;">
+          <div data-icon="more" style="position:absolute; inset:37.5% 0;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable Content (px=16, py=12, gap=16) -->
+    <div class="content">
+
+      <!-- ── Spotlight Card ──────────────────────── -->
+      <!--
+        Structure (from design context node 1:730):
+        - Outer: pb-14px (reserves headline overlap space)
+        - Container: border 1px #d4d4d4, rounded-8px, overflow-hidden, mb-(-14px)
+          - Gradient bg (103px tall)
+          - Contact text overlay (absolute, top-15 left-15)
+          - Close button (absolute, top-8 right-8)
+        - Headline section (pl-16, flex-col, align-start):
+          - Each line: bg-#171717, px-8 py-1px, heading-lg bold white
+      -->
+      <div style="position:relative; padding-bottom:14px; cursor:pointer;">
+        <!-- Container: clips gradient, 1px outline, 8px radius, mb=-14px -->
+        <div style="border:1px solid #d4d4d4; border-radius:8px; overflow:hidden; margin-bottom:-14px; position:relative;">
+          <!-- Gradient background (103px height, Figma linear gradient) -->
+          <div style="height:103px; background:linear-gradient(145deg,#F5A852 0%,#E06B4A 38%,#D04068 70%,#C8356A 100%); position:relative;"></div>
+          <!-- Contact text overlay (absolute top-15 left-15, gap-4) -->
+          <div style="position:absolute; top:15px; left:15px; display:flex; flex-direction:column; gap:4px;">
+            <p style="font-size:17px; font-weight:700; line-height:22px; letter-spacing:-0.43px; color:white; font-family:var(--font);">+41 77 171 17 17</p>
+            <p style="font-size:17px; font-weight:400; line-height:22px; letter-spacing:-0.43px; color:white; font-family:var(--font);">17 beers in the pub 🍻</p>
+          </div>
+          <!-- Close button (32×32, rgba(255,255,255,0.6), top-8 right-8) -->
+          <button style="position:absolute; top:8px; right:8px; width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.6); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" aria-label="Dismiss">
+            <div style="position:relative; width:16px; height:16px; overflow:hidden;">
+              <div data-icon="close" style="position:absolute; inset:18.75%;"></div>
+            </div>
+          </button>
+        </div>
+        <!-- Headline section (pl-16, pb-2px, flex-col, align-start) -->
+        <div style="padding-left:16px; padding-bottom:2px; display:flex; flex-direction:column; align-items:flex-start; position:relative; z-index:2;">
+          <!-- Line 1 -->
+          <div style="background:#171717; padding:1px 8px; align-self:flex-start;">
+            <p style="font-size:20px; font-weight:700; line-height:25px; letter-spacing:-0.45px; color:white; font-family:var(--font); white-space:nowrap;">You have received CHF 85.00</p>
+          </div>
+          <!-- Line 2 -->
+          <div style="background:#171717; padding:1px 8px; align-self:flex-start; margin-top:0;">
+            <p style="font-size:20px; font-weight:700; line-height:25px; letter-spacing:-0.45px; color:white; font-family:var(--font);">Headline 2</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Transactions ───────────────────────── -->
+      <!--
+        From design context node 418:7111:
+        - 1 row only (List item TRX)
+        - Icon: 32×32 circle bg-#f5f5f5, Account icon 16×16 inside
+        - Label: body-lg (17px) regular #262626
+        - Amount: body-lg (17px) semibold, green for positive
+        - Date: body-sm (13px) regular #525252
+      -->
+      <div>
+        <div class="section-header">
+          <span class="section-title">Transactions</span>
+          <button class="section-action">Show all</button>
+        </div>
+        <!-- Single transaction row (bg-white, p-16, gap-12) -->
+        <div style="background:var(--surface); border-radius:var(--radius-md); overflow:hidden;">
+          <div style="display:flex; align-items:flex-start; gap:12px; padding:16px; background:var(--surface);">
+            <!-- Icon: 32×32 circle, #f5f5f5 bg, Account icon 16×16 -->
+            <div style="width:32px; height:32px; border-radius:var(--radius-circle); background:#f5f5f5; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <div style="position:relative; width:16px; height:16px; overflow:hidden;">
+                <div data-icon="account" style="position:absolute; inset:0;"></div>
+              </div>
+            </div>
+            <!-- Content: name+amount row, then date row -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <div style="display:flex; gap:12px; align-items:flex-start;">
+                <p style="flex:1; font-size:17px; font-weight:400; line-height:22px; letter-spacing:-0.43px; color:var(--on-surface); font-family:var(--font);">Patrizia</p>
+                <p style="font-size:17px; font-weight:590; line-height:22px; letter-spacing:-0.43px; color:var(--brand-success); font-family:var(--font); flex-shrink:0;">+16.00</p>
+              </div>
+              <div style="display:flex; gap:12px; align-items:flex-start;">
+                <p style="font-size:13px; font-weight:400; line-height:18px; letter-spacing:-0.08px; color:var(--on-surface-secondary); font-family:var(--font);">23 Jun</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Partner Functions ──────────────────── -->
+      <!--
+        From design context node 418:7114:
+        - 4 cards in a SINGLE HORIZONTAL ROW (flex gap-18)
+        - Each card: bg-white, h-72px, rounded-8px, p-16, icon centered (32×32)
+        - Label below card: body-sm (13px) regular #262626 centered
+        - gap-4 between card and label
+      -->
+      <div>
+        <div class="section-header">
+          <span class="section-title">Partner functions</span>
+          <button class="section-action">Show all</button>
+        </div>
+        <!-- 4-card single row (gap=18px) -->
+        <div style="display:flex; gap:18px; align-items:flex-start; width:100%;">
+
+          <!-- Super Deals -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;">
+            <div style="background:var(--surface); height:72px; border-radius:8px; width:100%; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+              <div style="position:relative; width:32px; height:32px; overflow:hidden; flex-shrink:0;">
+                <div data-icon="superdeals" style="position:absolute; inset:12.5% 4.69% 6.25% 0.52%;"></div>
+              </div>
+            </div>
+            <p style="font-size:13px; font-weight:400; line-height:18px; letter-spacing:-0.08px; color:var(--on-surface); text-align:center; width:100%; font-family:var(--font);">Super Deals</p>
+          </div>
+
+          <!-- Parking -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;">
+            <div style="background:var(--surface); height:72px; border-radius:8px; width:100%; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+              <div style="position:relative; width:32px; height:32px; overflow:hidden; flex-shrink:0;">
+                <div data-icon="parking" style="position:absolute; inset:0;"></div>
+              </div>
+            </div>
+            <p style="font-size:13px; font-weight:400; line-height:18px; letter-spacing:-0.08px; color:var(--on-surface); text-align:center; width:100%; font-family:var(--font);">Parking</p>
+          </div>
+
+          <!-- Spin and win -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;">
+            <div style="background:var(--surface); height:72px; border-radius:8px; width:100%; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+              <div style="position:relative; width:32px; height:32px; overflow:hidden; flex-shrink:0;">
+                <div data-icon="spinwin" style="position:absolute; inset:3.13% 9.38% 0 9.38%;"></div>
+              </div>
+            </div>
+            <p style="font-size:13px; font-weight:400; line-height:18px; letter-spacing:-0.08px; color:var(--on-surface); text-align:center; width:100%; font-family:var(--font);">Spin and win</p>
+          </div>
+
+          <!-- Cashback (3-layer icon: 46×30 in 32×32 context, centred) -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;">
+            <div style="background:var(--surface); height:72px; border-radius:8px; width:100%; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+              <!-- Cashback icon: 46×30, 3 layered images injected by JS -->
+              <div id="cashback-icon" style="position:relative; width:46px; height:30px; flex-shrink:0; overflow:hidden;"></div>
+            </div>
+            <p style="font-size:13px; font-weight:400; line-height:18px; letter-spacing:-0.08px; color:var(--on-surface); text-align:center; width:100%; font-family:var(--font);">Cashback</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── P2P ─────────────────────────────────── -->
+      <!--
+        From design context node 418:7133:
+        - 2 buttons side by side, gap-8, each flex-1
+        - bg-white, rounded-6px (--p-border-radius-150), p-24
+        - Icon: 32×32 Figma asset image
+        - Label: body-md (15px) semibold (590) #262626 centered
+        - gap-12 between icon and label
+      -->
+      <div style="flex:1; min-height:0;">
+        <div style="display:flex; gap:8px; height:100%; min-height:100px;">
+
+          <!-- Send -->
+          <button style="flex:1; background:var(--surface); border-radius:var(--radius-sm); border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; height:100%;" onclick="">
+            <div style="position:relative; width:32px; height:32px; overflow:hidden; flex-shrink:0;">
+              <div data-icon="send" style="position:absolute; inset:3.13% 3.13% 6.25% 3.13%;"></div>
+            </div>
+            <p style="font-size:15px; font-weight:590; line-height:20px; letter-spacing:-0.23px; color:var(--on-surface); text-align:center; font-family:var(--font); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Send</p>
+          </button>
+
+          <!-- Request and split -->
+          <button style="flex:1; background:var(--surface); border-radius:var(--radius-sm); border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; height:100%;" onclick="goTo(1)">
+            <div style="position:relative; width:32px; height:32px; overflow:hidden; flex-shrink:0;">
+              <div data-icon="request" style="position:absolute; inset:0 3.13% 6.25% 3.13%;"></div>
+            </div>
+            <p style="font-size:15px; font-weight:590; line-height:20px; letter-spacing:-0.23px; color:var(--on-surface); text-align:center; font-family:var(--font); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Request and split</p>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- ── Pay Button ──────────────────────────── -->
+      <!--
+        From design context node 418:7137:
+        - bg-#262626, rounded-6px, min-height 56px, gap-12
+        - Icon: 24×24 Figma asset (Pay/QR icon)
+        - Label: body-lg (17px) semibold (590) white
+      -->
+      <button class="btn-primary">
+        <!-- Pay icon: 24×24, vector at inset 8.33% -->
+        <div style="position:relative; width:24px; height:24px; overflow:hidden; flex-shrink:0;">
+          <div data-icon="pay" style="position:absolute; inset:8.33%;"></div>
+        </div>
+        <span class="btn-primary-label">Pay</span>
+      </button>
+
+    </div><!-- /content -->
+
+    <!-- Home Indicator (h=21px, pill 139×5px, 8px from bottom) -->
+    <div class="home-indicator">
+      <div class="home-pill"></div>
+    </div>
+
+  </div><!-- /screen-0 -->
+
+  <!-- ═══════════════════════════════════
+       Future screens: add .screen divs here
+       Use .nav-bar-back + .nav-back-btn pattern
+  ═══════════════════════════════════ -->
+
+</div><!-- /phone -->
+
+<script>
+  const screens = document.querySelectorAll('.screen');
+  function goTo(index) {
+    screens.forEach((s, i) => s.classList.toggle('active', i === index));
+  }
+</script>
+
+</body>
+</html>

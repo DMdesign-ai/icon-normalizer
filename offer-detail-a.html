@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=393, initial-scale=1.0" />
+  <title>Variant A – Cashback Hero</title>
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+  <style>
+    :root {
+      --surface:                #ffffff;
+      --surface-variant:        #fafafa;
+      --surface-variant-border: #e5e5e5;
+      --on-surface:             #262626;
+      --on-surface-secondary:   #525252;
+      --on-surface-tertiary:    #a3a3a3;
+      --on-surface-quaternary:  #d4d4d4;
+      --brand-primary:          #262626;
+      --brand-on-primary:       #ffffff;
+      --brand-secondary:        #007aff;
+      --accents-blue:           #0088ff;
+      --status-warning:         #f5a623;
+      --teal:                   #187A6C;
+      --font: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+
+      --body-xs-size: 11px; --body-xs-line-height: 13px; --body-xs-letter-spacing: 0.06px;
+      --body-sm-size: 13px; --body-sm-line-height: 18px; --body-sm-letter-spacing: -0.08px;
+      --body-md-size: 15px; --body-md-line-height: 20px; --body-md-letter-spacing: -0.23px;
+      --heading-sm-size: 15px; --heading-sm-line-height: 20px; --heading-sm-letter-spacing: -0.23px;
+      --heading-xl-size: 22px; --heading-xl-line-height: 28px; --heading-xl-letter-spacing: -0.26px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #e5e5ea;
+      display: flex;
+      justify-content: center;
+      padding: 32px 0 64px;
+      min-height: 100vh;
+    }
+
+    .frame {
+      width: 393px;
+      background: var(--surface);
+      border-radius: 44px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Handle */
+    .handle {
+      width: 40px; height: 4px;
+      background: #d4d4d4;
+      border-radius: 99999px;
+      margin: 12px auto 0;
+      flex-shrink: 0;
+    }
+
+    /* Nav */
+    .nav-bar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      width: 36px; height: 36px;
+      border-radius: 100px;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .nav-btn-close { background: rgba(118,118,128,0.12); }
+    .nav-btn-share { background: var(--accents-blue); }
+    .nav-title {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%,-50%);
+      font-family: var(--font); font-weight: 600;
+      font-size: 17px; line-height: 22px; letter-spacing: -0.43px;
+      color: #1a1a1a; white-space: nowrap;
+    }
+
+    /* ── HERO CARD (Variant A key change) ── */
+    /* Gradient brand card instead of photo */
+    .hero-card {
+      margin: 0 16px;
+      border-radius: 16px;
+      overflow: hidden;
+      flex-shrink: 0;
+      position: relative;
+      height: 160px;
+      background: linear-gradient(135deg, #F5A852 0%, #C8356A 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 16px;
+    }
+    /* subtle photo as background tint */
+    .hero-card-bg {
+      position: absolute;
+      inset: 0;
+      object-fit: cover;
+      width: 100%; height: 100%;
+      opacity: 0.18;
+      mix-blend-mode: luminosity;
+    }
+    .hero-card-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .hero-cashback-number {
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 52px;
+      line-height: 52px;
+      letter-spacing: -1px;
+      color: #ffffff;
+    }
+    .hero-cashback-label {
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 15px;
+      line-height: 20px;
+      letter-spacing: -0.23px;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 6px;
+    }
+    .hero-left {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    /* Brand logo + name in top-right of card */
+    .hero-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .hero-brand-avatar {
+      width: 44px; height: 44px;
+      border-radius: 100px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.4);
+      background: white;
+    }
+    .hero-brand-avatar img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .hero-brand-name {
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 11px;
+      line-height: 13px;
+      letter-spacing: 0.06px;
+      color: rgba(255,255,255,0.9);
+      text-align: right;
+    }
+
+    /* Status chip — now in content, not buried in overlay */
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px 0;
+      flex-shrink: 0;
+    }
+    .status-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff3e0;
+      border-radius: 99px;
+      padding: 5px 10px;
+      border: 1px solid rgba(245,166,35,0.3);
+    }
+    .status-chip-dot {
+      width: 7px; height: 7px;
+      border-radius: 99px;
+      background: var(--status-warning);
+      flex-shrink: 0;
+    }
+    .status-chip-label {
+      font-family: var(--font);
+      font-weight: 590;
+      font-size: 12px;
+      line-height: 16px;
+      color: #b45309;
+    }
+    .status-activated {
+      font-family: var(--font);
+      font-weight: 590;
+      font-size: 13px;
+      line-height: 18px;
+      letter-spacing: -0.08px;
+      color: var(--on-surface-secondary);
+    }
+
+    /* Scrollable content */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: none;
+      padding-bottom: 90px;
+    }
+    .content::-webkit-scrollbar { display: none; }
+
+    /* Description */
+    .description {
+      padding: 12px 16px 0;
+      font-family: var(--font);
+      font-weight: 400;
+      font-size: var(--body-sm-size);
+      line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing);
+      color: var(--on-surface-secondary);
+    }
+
+    /* Detail rows */
+    .detail-section {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .detail-item {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 4px 32px;
+      width: 100%;
+    }
+    .detail-item-center { align-items: center; }
+    .detail-icon {
+      width: 16px; height: 16px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      overflow: hidden;
+    }
+    .detail-item-center .detail-icon { margin-top: 0; }
+    .detail-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .detail-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+    .detail-title {
+      font-family: var(--font); font-weight: 590;
+      font-size: var(--heading-sm-size); line-height: var(--heading-sm-line-height);
+      letter-spacing: var(--heading-sm-letter-spacing); color: var(--on-surface);
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .detail-subtitle {
+      font-family: var(--font); font-weight: 400;
+      font-size: var(--body-md-size); line-height: var(--body-md-line-height);
+      letter-spacing: var(--body-md-letter-spacing); color: var(--on-surface-secondary);
+    }
+    .detail-warning {
+      display: flex; align-items: center; gap: 2px;
+    }
+    .detail-warning img { width: 16px; height: 16px; object-fit: contain; display: block; flex-shrink: 0; }
+    .detail-warning span {
+      font-family: var(--font); font-weight: 700;
+      font-size: var(--body-xs-size); line-height: var(--body-xs-line-height);
+      letter-spacing: var(--body-xs-letter-spacing); color: var(--status-warning);
+    }
+    .divider { height: 0.5px; background: var(--on-surface-quaternary); width: 343px; flex-shrink: 0; }
+
+    /* How it works */
+    .how-it-works { padding: 16px; width: 100%; }
+    .how-it-works-inner {
+      background: var(--surface-variant);
+      border: 1px solid var(--surface-variant-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      width: 100%;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .how-it-works-title {
+      font-family: var(--font); font-weight: 590;
+      font-size: var(--heading-sm-size); line-height: var(--heading-sm-line-height);
+      letter-spacing: var(--heading-sm-letter-spacing); color: var(--on-surface);
+    }
+    .how-it-works-items { display: flex; flex-direction: column; gap: 8px; }
+    .how-it-works-item { display: flex; align-items: flex-start; }
+    .how-it-works-item::before {
+      content: "•"; font-family: var(--font); font-size: 13px;
+      line-height: 18px; color: var(--on-surface); flex-shrink: 0; margin-right: 6px;
+    }
+    .how-it-works-item p {
+      font-family: var(--font); font-weight: 400;
+      font-size: var(--body-sm-size); line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing); color: var(--on-surface);
+    }
+    .how-it-works-item p b { font-weight: 700; }
+
+    /* Terms */
+    .terms { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+    .terms-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; height: 20px; gap: 16px;
+    }
+    .terms-title {
+      font-family: var(--font); font-weight: 590;
+      font-size: var(--body-sm-size); line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing); color: var(--on-surface); flex: 1;
+    }
+    .terms-toggle {
+      font-family: var(--font); font-weight: 590;
+      font-size: var(--body-sm-size); line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing); color: var(--brand-secondary);
+      background: none; border: none; cursor: pointer; padding: 0;
+    }
+    .terms-list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .terms-item { display: flex; gap: 8px; align-items: flex-start; padding-left: 16px; width: 345px; }
+    .terms-bullet { font-family: "Inter", Arial, sans-serif; font-size: 15px; font-weight: 400; line-height: 22px; color: var(--on-surface-secondary); flex-shrink: 0; }
+    .terms-text {
+      font-family: var(--font); font-weight: 400;
+      font-size: var(--body-sm-size); line-height: var(--body-sm-line-height);
+      letter-spacing: var(--body-sm-letter-spacing); color: var(--on-surface-secondary);
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e5e5e5;
+      width: 100%; height: 69px;
+      background: var(--surface);
+      padding: 14px 24px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .cta-btn {
+      width: 100%; min-height: 40px;
+      background: var(--brand-primary); color: var(--brand-on-primary);
+      border: none; border-radius: 6px;
+      font-family: var(--font); font-weight: 590;
+      font-size: var(--body-md-size); line-height: var(--body-md-line-height);
+      letter-spacing: var(--body-md-letter-spacing);
+      text-align: center; cursor: pointer; padding: 8px 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="frame">
+  <div class="handle"></div>
+
+  <div class="nav-bar">
+    <button class="nav-btn nav-btn-close" aria-label="Schließen">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M1 1L13 13M13 1L1 13" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <span class="nav-title">Tranza Zürich</span>
+    <button class="nav-btn nav-btn-share" aria-label="Teilen">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+        <path d="M8.5 11V2M8.5 2L5.5 5M8.5 2L11.5 5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 9v4a1 1 0 001 1h9a1 1 0 001-1V9" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Gradient hero card — cashback as the star -->
+  <div class="hero-card">
+    <img class="hero-card-bg"
+         src="https://www.figma.com/api/mcp/asset/84294096-16d0-4f61-8d24-dd88820bc7c4"
+         alt="" />
+    <div class="hero-card-content">
+      <div class="hero-left">
+        <span class="hero-cashback-number">12%</span>
+        <span class="hero-cashback-label">Cashback</span>
+      </div>
+      <div class="hero-brand">
+        <div class="hero-brand-avatar">
+          <img src="https://www.figma.com/api/mcp/asset/4fd3fcbf-4575-4dfc-a8e0-d509b651f3fd" alt="Tranza Zürich" />
+        </div>
+        <span class="hero-brand-name">Tranza Zürich</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status row — visible, not buried -->
+  <div class="status-row">
+    <div class="status-chip">
+      <div class="status-chip-dot"></div>
+      <span class="status-chip-label">Bald zu Ende · 24. August</span>
+    </div>
+    <span class="status-activated">Nicht aktiviert</span>
+  </div>
+
+  <div class="content">
+    <div style="display:flex;flex-direction:column;gap:24px;align-items:center;padding-bottom:24px;width:100%;">
+
+      <!-- Description -->
+      <div style="padding:12px 16px 0;width:100%;">
+        <p style="font-family:var(--font);font-weight:400;font-size:var(--body-sm-size);line-height:var(--body-sm-line-height);letter-spacing:var(--body-sm-letter-spacing);color:var(--on-surface-secondary);">
+          Tranza Travel &amp; Outdoor ist das Kompetenzzentrum für hochwertige Reise- und Outdoorausrüstung. Ob Wandern, Camping, Fern- und Nahreisen, Velofahren, Klettern oder auch Wintersport – du findest sicher die passende Ausrüstung für dich.
+        </p>
+      </div>
+
+      <!-- Detail rows -->
+      <div style="display:flex;flex-direction:column;gap:0;align-items:center;width:100%;margin-top:-8px;">
+        <div class="detail-section">
+          <div class="detail-item">
+            <div class="detail-icon"><img src="https://www.figma.com/api/mcp/asset/1b1e88e9-a992-45a0-9c17-a7a4a2f4ba09" alt="" /></div>
+            <div class="detail-text">
+              <span class="detail-title">22. August – 24. August 2025</span>
+              <span class="detail-subtitle">7 Tage gültig</span>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="detail-item">
+            <div class="detail-icon"><img src="https://www.figma.com/api/mcp/asset/1b1e88e9-a992-45a0-9c17-a7a4a2f4ba09" alt="" /></div>
+            <div class="detail-text">
+              <span class="detail-title">1× einlösbar</span>
+              <span class="detail-subtitle">Online &amp; vor Ort</span>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="detail-item detail-item-center">
+            <div class="detail-icon"><img src="https://www.figma.com/api/mcp/asset/1b1e88e9-a992-45a0-9c17-a7a4a2f4ba09" alt="" /></div>
+            <div class="detail-text" style="gap:0;">
+              <span class="detail-title">Gilt für den gesamten Warenkorb</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="how-it-works">
+        <div class="how-it-works-inner">
+          <p class="how-it-works-title">So funktioniert's</p>
+          <div class="how-it-works-items">
+            <div class="how-it-works-item"><p>Cashback-Angebot <b>aktivieren</b></p></div>
+            <div class="how-it-works-item"><p><b>Mit TWINT bezahlen</b> (online oder vor Ort)</p></div>
+            <div class="how-it-works-item"><p>Cashback wird automatisch gutgeschrieben</p></div>
+            <div class="how-it-works-item"><p>Dein Cashback wird dir <b>nach Ablauf der Rückgabefrist ausbezahlt</b></p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terms -->
+      <div class="terms">
+        <div class="terms-header">
+          <span class="terms-title">Geschäftsbedingungen</span>
+          <button class="terms-toggle">Button</button>
+        </div>
+        <div class="terms-list">
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Das Angebot ist gültig im angegebenen Zeitraum.</span></div>
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Cashback gilt nur, wenn die Zahlung mit TWINT erfolgt (online oder vor Ort).</span></div>
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Der Cashback wird innerhalb von 24 Stunden in der App sichtbar.</span></div>
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Die endgültige Gutschrift erfolgt nach Ablauf der Rückgabefrist.</span></div>
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Bei Rückgabe oder Stornierung eines Kaufs kann der Cashback aberkannt werden.</span></div>
+          <div class="terms-item"><span class="terms-bullet">•</span><span class="terms-text">Der Händler kann das Angebot jederzeit ändern oder vorzeitig beenden.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="cta-btn">Jetzt aktivieren</button>
+  </div>
+</div>
+</body>
+</html>
