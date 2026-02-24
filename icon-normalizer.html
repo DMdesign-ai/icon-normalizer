@@ -1140,9 +1140,12 @@ function normalizeSVG(svgString, keyline, size) {
   // Keyline dimensions for target size
   const kl = SPEC.keylines[size][keyline];
 
-  // Scale factor: fit content bounding box into keyline bounds
-  const sx = kl.w / bw;
-  const sy = kl.h / bh;
+  // Scale factor: fit content bounding box into keyline bounds.
+  // Subtract 1dp so the 0.5dp stroke overhang on each side lands exactly at
+  // the keyline edge (getBBox is geometric-only; stroke extends beyond it).
+  const strokeAllowance = 1; // 0.5dp per side × 2 sides = 1dp total
+  const sx = (kl.w - strokeAllowance) / bw;
+  const sy = (kl.h - strokeAllowance) / bh;
   const s = Math.min(sx, sy);
 
   // After scale, content size in target dp space
