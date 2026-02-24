@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Icon Safe Area Normalizer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --primary: #262626;
+  --accent: #007aff;
+  --secondary: #525252;
+  --border: #e0e0e0;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.16), 0 0 4px rgba(0,0,0,0.08);
+  --font: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  --color-circle: #007aff;
+  --color-square: #187A6C;
+  --color-vertical: #B8912A;
+  --color-horizontal: #7B5EA7;
+  --success: #4caf50;
+  --error: #f44336;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  font-size: 15px;
+}
+
+#svg-sandbox {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  visibility: hidden;
+  pointer-events: none;
+  width: 200px;
+  height: 200px;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 32px 0 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+
+header div h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+header div p {
+  font-size: 13px;
+  color: var(--secondary);
+  margin-top: 3px;
+}
+
+/* Spec toggle */
+#spec-toggle-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+#spec-toggle-btn:hover { border-color: var(--primary); color: var(--primary); }
+#spec-toggle-btn svg { transition: transform 0.2s; }
+#spec-toggle-btn.open svg { transform: rotate(180deg); }
+
+#spec-panel {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  overflow: hidden;
+  display: none;
+}
+#spec-panel.open { display: block; }
+
+.spec-inner {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.spec-table-wrap h3 {
+  font-size: 13px;
+  font-weight: 590;
+  color: var(--secondary);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.spec-table th {
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+  padding: 7px 10px;
+  text-align: left;
+}
+.spec-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.spec-table tr:last-child td { border-bottom: none; }
+.spec-table tr:nth-child(even) td { background: #fafafa; }
+
+/* Upload zone */
+#upload-zone { margin-bottom: 20px; }
+
+#drop-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+#drop-area:hover, #drop-area.drag-over {
+  border-color: var(--accent);
+  background: rgba(0, 122, 255, 0.04);
+}
+#drop-area .upload-icon { margin-bottom: 12px; color: var(--secondary); }
+#drop-area .upload-label {
+  font-size: 17px;
+  font-weight: 590;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+#drop-area .upload-hint { font-size: 13px; color: var(--secondary); }
+#browse-link {
+  color: var(--accent);
+  font-weight: 590;
+  cursor: pointer;
+}
+
+/* Queue bar */
+#queue-bar {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  display: none;
+}
+#queue-bar.visible { display: flex; }
+
+.queue-left { display: flex; align-items: center; gap: 12px; }
+#queue-text { font-size: 13px; font-weight: 590; }
+#queue-dots { display: flex; gap: 4px; }
+.q-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s;
+}
+.q-dot.done { background: var(--success); }
+.q-dot.active { background: var(--accent); }
+
+#skip-btn {
+  font-size: 13px;
+  color: var(--secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+#skip-btn:hover { background: var(--bg); }
+
+/* Processing panel */
+#process-panel {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 24px;
+  display: none;
+}
+#process-panel.visible { display: block; }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.panel-header h2 { font-size: 20px; font-weight: 700; }
+
+.panel-inner {
+  display: grid;
+  grid-template-columns: 1fr 240px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.preview-col h3 {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
+}
+
+.preview-box {
+  aspect-ratio: 1;
+  max-width: 220px;
+  background: #f8f8f8;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.preview-box svg { width: 60%; height: 60%; }
+.preview-box img { width: 60%; height: 60%; object-fit: contain; }
+
+/* Normalized preview: layered */
+#norm-preview-wrap {
+  aspect-ratio: 1;
+  max-width: 220px;
+  background: #f8f8f8;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+#norm-icon-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#norm-icon-layer svg {
+  width: 100%;
+  height: 100%;
+}
+#norm-overlay-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Size strip */
+#size-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 12px;
+  background: #f4f4f4;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.size-demo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.size-demo span {
+  font-size: 10px;
+  color: var(--secondary);
+}
+.size-demo .icon-frame {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.size-demo .icon-frame svg {
+  display: block;
+}
+
+/* Controls column */
+.controls-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.control-group { display: flex; flex-direction: column; gap: 7px; }
+.control-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+#icon-name {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--primary);
+  background: white;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#icon-name:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+}
+
+/* Keyline buttons */
+#keyline-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.keyline-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: var(--font);
+  position: relative;
+}
+.keyline-btn[data-keyline="circle"] { color: var(--color-circle); }
+.keyline-btn[data-keyline="square"] { color: var(--color-square); }
+.keyline-btn[data-keyline="vertical"] { color: var(--color-vertical); }
+.keyline-btn[data-keyline="horizontal"] { color: var(--color-horizontal); }
+
+.keyline-btn.active[data-keyline="circle"] { border-color: var(--color-circle); background: rgba(0,122,255,0.06); }
+.keyline-btn.active[data-keyline="square"] { border-color: var(--color-square); background: rgba(24,122,108,0.06); }
+.keyline-btn.active[data-keyline="vertical"] { border-color: var(--color-vertical); background: rgba(184,145,42,0.06); }
+.keyline-btn.active[data-keyline="horizontal"] { border-color: var(--color-horizontal); background: rgba(123,94,167,0.06); }
+
+.keyline-btn .kl-shape { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+.keyline-btn .kl-label { font-size: 10px; font-weight: 700; text-align: center; }
+
+.auto-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  background: var(--primary);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.keyline-btn.auto-detected .auto-badge { opacity: 1; }
+
+/* Size buttons */
+#size-buttons { display: flex; gap: 6px; }
+.size-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 590;
+  color: var(--secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.size-btn:hover { border-color: var(--accent); color: var(--accent); }
+.size-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+
+/* Save button */
+#save-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 590;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+#save-btn:hover { opacity: 0.85; }
+#save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Error state */
+.proc-error {
+  background: rgba(244,67,54,0.08);
+  border: 1px solid rgba(244,67,54,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--error);
+  display: none;
+}
+.proc-error.visible { display: block; }
+
+/* Library */
+#library-section {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+#library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+#library-header h2 { font-size: 20px; font-weight: 700; }
+#library-count { font-size: 15px; font-weight: 400; color: var(--secondary); }
+
+#export-zip-btn {
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 590;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#export-zip-btn:hover { background: rgba(0,122,255,0.06); }
+#export-zip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#filter-bar {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: white;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 590;
+  color: var(--secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn:hover { border-color: var(--primary); color: var(--primary); }
+.filter-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+#library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+/* Icon card */
+.icon-card {
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: default;
+}
+.icon-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #d0d0d0; }
+.icon-card:hover .card-actions { opacity: 1; }
+
+.icon-thumb {
+  width: 60px;
+  height: 60px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-thumb svg { width: 38px; height: 38px; }
+
+.icon-card-name {
+  font-size: 11px;
+  font-weight: 590;
+  color: var(--primary);
+  text-align: center;
+  word-break: break-all;
+  max-width: 100%;
+  line-height: 1.3;
+}
+
+.keyline-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.keyline-badge.circle { background: rgba(0,122,255,0.1); color: var(--color-circle); }
+.keyline-badge.square { background: rgba(24,122,108,0.1); color: var(--color-square); }
+.keyline-badge.vertical { background: rgba(184,145,42,0.1); color: var(--color-vertical); }
+.keyline-badge.horizontal { background: rgba(123,94,167,0.1); color: var(--color-horizontal); }
+
+.size-label {
+  font-size: 9px;
+  color: var(--secondary);
+  margin-top: -4px;
+}
+
+.card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.card-action-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+  color: var(--secondary);
+}
+.card-action-btn:hover { background: #f0f0f0; }
+.card-action-btn.delete:hover { background: #fee; border-color: #f44336; color: #f44336; }
+
+/* Empty state */
+#empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--secondary);
+  display: none;
+}
+#empty-state.visible { display: block; }
+#empty-state svg { opacity: 0.25; margin-bottom: 12px; }
+#empty-state p { font-size: 15px; }
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--primary);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 590;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.success { background: var(--success); }
+#toast.error { background: var(--error); }
+
+@media (max-width: 800px) {
+  .panel-inner { grid-template-columns: 1fr; }
+  .spec-inner { grid-template-columns: 1fr; }
+}
+
+/* ── Overlay toggle ── */
+.norm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.norm-header h3 { margin-bottom: 0; }
+#overlay-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+#overlay-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,122,255,0.06);
+}
+#overlay-toggle:hover { border-color: var(--primary); color: var(--primary); }
+
+/* ── Card checkbox ── */
+.card-checkbox {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
+  color: white;
+  z-index: 2;
+}
+.icon-card:hover .card-checkbox,
+.icon-card.selected .card-checkbox { opacity: 1; }
+.card-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  opacity: 1;
+}
+.icon-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0,122,255,0.15);
+}
+
+/* ── Selection bar ── */
+#selection-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+#selection-bar.visible { display: flex; }
+#sel-count {
+  font-size: 13px;
+  font-weight: 590;
+  color: var(--primary);
+  flex: 1;
+}
+#sel-download-btn {
+  padding: 8px 14px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 590;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+#sel-download-btn:hover { opacity: 0.85; }
+#sel-clear-btn {
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+#sel-clear-btn:hover { border-color: var(--primary); color: var(--primary); }
+</style>
+</head>
+<body>
+
+<!-- Hidden sandbox for getBBox() — must be in visible DOM -->
+<div id="svg-sandbox" aria-hidden="true"></div>
+
+<div id="app">
+  <header>
+    <div>
+      <h1>Icon Safe Area Normalizer</h1>
+      <p>Upload SVGs → normalize strokes to 1dp → fit to keyline → save to library</p>
+    </div>
+    <button id="spec-toggle-btn">
+      Spec reference
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <!-- Collapsible spec panel -->
+  <div id="spec-panel">
+    <div class="spec-inner">
+      <div class="spec-table-wrap">
+        <h3>Canvas &amp; Safe Area</h3>
+        <table class="spec-table">
+          <thead>
+            <tr><th>Size</th><th>Canvas</th><th>Safe Zone</th><th>Padding</th><th>Stroke</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16dp</td><td>16×16</td><td>14×14</td><td>1dp</td><td>1dp</td></tr>
+            <tr><td>24dp</td><td>24×24</td><td>20×20</td><td>2dp</td><td>1dp</td></tr>
+            <tr><td>32dp</td><td>32×32</td><td>28×28</td><td>2dp</td><td>1dp</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="spec-table-wrap">
+        <h3>Keyline Shapes (W × H)</h3>
+        <table class="spec-table">
+          <thead>
+            <tr><th>Size</th><th>Circle</th><th>Square</th><th>Vertical</th><th>Horizontal</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>16dp</td><td>14dp ⌀</td><td>12×12</td><td>10×12</td><td>12×10</td></tr>
+            <tr><td>24dp</td><td>22dp ⌀</td><td>20×20</td><td>16×20</td><td>20×16</td></tr>
+            <tr><td>32dp</td><td>30dp ⌀</td><td>28×28</td><td>22×28</td><td>28×22</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:11px;color:var(--secondary);margin-top:8px">Circle: circular icons · Square: geometric/square · Vertical: portrait (person, phone, door) · Horizontal: landscape (card, monitor)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload zone -->
+  <div id="upload-zone">
+    <input type="file" id="file-input" accept=".svg" multiple style="display:none">
+    <div id="drop-area">
+      <div class="upload-icon">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <rect x="6" y="12" width="28" height="22" rx="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M14 20l6-6 6 6M20 14v14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p class="upload-label">Drop SVG files here or <span id="browse-link">browse</span></p>
+      <p class="upload-hint">Supports multiple files at once</p>
+    </div>
+  </div>
+
+  <!-- Queue indicator -->
+  <div id="queue-bar">
+    <div class="queue-left">
+      <span id="queue-text">Processing 1 of 1</span>
+      <div id="queue-dots"></div>
+    </div>
+    <button id="skip-btn">Skip this icon</button>
+  </div>
+
+  <!-- Processing panel -->
+  <div id="process-panel">
+    <div class="panel-header">
+      <h2 id="panel-filename">Icon name</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div id="proc-error" class="proc-error">Could not parse SVG</div>
+      </div>
+    </div>
+
+    <div class="panel-inner">
+      <!-- Original preview -->
+      <div class="preview-col">
+        <h3>Original</h3>
+        <div class="preview-box" id="original-preview"></div>
+        <p id="original-info" style="font-size:11px;color:var(--secondary);margin-top:8px;text-align:center"></p>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls-col">
+        <div class="control-group">
+          <label>Icon name</label>
+          <input type="text" id="icon-name" placeholder="e.g. arrow-right">
+        </div>
+
+        <div class="control-group">
+          <label>Keyline shape</label>
+          <div id="keyline-buttons">
+            <button class="keyline-btn" data-keyline="circle">
+              <span class="auto-badge">AUTO</span>
+              <span class="kl-shape">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                  <circle cx="17" cy="17" r="12" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </span>
+              <span class="kl-label">Circle</span>
+            </button>
+            <button class="keyline-btn" data-keyline="square">
+              <span class="auto-badge">AUTO</span>
+              <span class="kl-shape">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                  <rect x="5" y="5" width="24" height="24" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </span>
+              <span class="kl-label">Square</span>
+            </button>
+            <button class="keyline-btn" data-keyline="vertical">
+              <span class="auto-badge">AUTO</span>
+              <span class="kl-shape">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                  <rect x="8" y="3" width="18" height="28" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </span>
+              <span class="kl-label">Vertical</span>
+            </button>
+            <button class="keyline-btn" data-keyline="horizontal">
+              <span class="auto-badge">AUTO</span>
+              <span class="kl-shape">
+                <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                  <rect x="3" y="8" width="28" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </span>
+              <span class="kl-label">Horizontal</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>Canvas size</label>
+          <div id="size-buttons">
+            <button class="size-btn" data-size="16">16dp</button>
+            <button class="size-btn active" data-size="24">24dp</button>
+            <button class="size-btn" data-size="32">32dp</button>
+          </div>
+        </div>
+
+        <button id="save-btn">Save to Library</button>
+      </div>
+
+      <!-- Normalized preview -->
+      <div class="preview-col">
+        <div class="norm-header">
+          <h3>Normalized <span id="norm-info" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h3>
+          <button id="overlay-toggle" class="active" title="Toggle keyline overlay">
+            <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+              <ellipse cx="6.5" cy="5" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.2"/>
+              <circle cx="6.5" cy="5" r="1.8" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+        <div id="norm-preview-wrap">
+          <div id="norm-icon-layer"></div>
+          <svg id="norm-overlay-layer" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div id="size-strip"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Library -->
+  <div id="library-section">
+    <div id="library-header">
+      <h2>Icon Library <span id="library-count">(0 icons)</span></h2>
+      <button id="export-zip-btn" disabled>Export all as ZIP</button>
+    </div>
+    <div id="filter-bar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="circle">Circle</button>
+      <button class="filter-btn" data-filter="square">Square</button>
+      <button class="filter-btn" data-filter="vertical">Vertical</button>
+      <button class="filter-btn" data-filter="horizontal">Horizontal</button>
+    </div>
+    <div id="library-grid"></div>
+    <div id="selection-bar">
+      <span id="sel-count">0 selected</span>
+      <button id="sel-download-btn">↓ Download (all 3 sizes)</button>
+      <button id="sel-clear-btn">Clear</button>
+    </div>
+    <div id="empty-state" class="visible">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="8" y="8" width="32" height="32" rx="4" stroke="#262626" stroke-width="1.5"/>
+        <path d="M17 24l5 5 9-9" stroke="#262626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <p>No icons yet. Upload SVG files above to get started.</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// SPEC DATA
+// ═══════════════════════════════════════════════════════════
+const SPEC = {
+  // keylines[size][type] = { w: width, h: height } in dp
+  // For circle: w = h = diameter
+  keylines: {
+    16: {
+      circle:     { w: 14, h: 14 },
+      square:     { w: 12, h: 12 },
+      vertical:   { w: 10, h: 12 },  // 10dp wide × 12dp tall (portrait)
+      horizontal: { w: 12, h: 10 },  // 12dp wide × 10dp tall (landscape)
+    },
+    24: {
+      circle:     { w: 22, h: 22 },
+      square:     { w: 20, h: 20 },
+      vertical:   { w: 16, h: 20 },  // 16dp wide × 20dp tall
+      horizontal: { w: 20, h: 16 },  // 20dp wide × 16dp tall
+    },
+    32: {
+      circle:     { w: 30, h: 30 },
+      square:     { w: 28, h: 28 },
+      vertical:   { w: 22, h: 28 },  // 22dp wide × 28dp tall
+      horizontal: { w: 28, h: 22 },  // 28dp wide × 22dp tall
+    },
+  },
+  padding: { 16: 1, 24: 2, 32: 2 },
+  keylineColors: {
+    circle: '#007aff',
+    square: '#187A6C',
+    vertical: '#B8912A',
+    horizontal: '#7B5EA7',
+  },
+};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const state = {
+  queue: [],        // Array of File objects
+  queueIndex: 0,
+  currentRawSvg: null,
+  currentKeyline: 'square',
+  currentSize: 24,
+  currentNormalizedSvg: null,
+  library: [],
+  filter: 'all',
+  overlayVisible: true,
+  selectedIds: new Set(),
+};
+
+// ═══════════════════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════════════════
+const STORAGE_KEY = 'iconNormalizerLibrary_v1';
+
+function loadLibrary() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state.library = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    state.library = [];
+  }
+}
+
+function saveLibraryToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      showToast('Storage full — some older icons may need to be removed', 'error');
+    }
+  }
+}
+
+function addToLibrary(icon) {
+  state.library.unshift(icon);
+  saveLibraryToStorage();
+}
+
+function deleteFromLibrary(id) {
+  state.library = state.library.filter(ic => ic.id !== id);
+  saveLibraryToStorage();
+  renderLibrary();
+  showToast('Icon removed');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SVG PARSING + NORMALIZATION
+// ═══════════════════════════════════════════════════════════
+
+function parseSVGString(svgString) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgString, 'image/svg+xml');
+  const root = doc.documentElement;
+  if (root.querySelector('parsererror')) {
+    throw new Error('Invalid SVG — parse error');
+  }
+  if (root.tagName.toLowerCase() !== 'svg') {
+    throw new Error('File does not contain an SVG root element');
+  }
+  return { doc, root };
+}
+
+function ensureViewBox(svgEl) {
+  // Make sure we have a viewBox
+  const vb = svgEl.viewBox && svgEl.viewBox.baseVal;
+  if (vb && vb.width > 0 && vb.height > 0) {
+    return { x: vb.x, y: vb.y, w: vb.width, h: vb.height };
+  }
+  // Fall back to width/height attrs
+  const w = parseFloat(svgEl.getAttribute('width')) || 24;
+  const h = parseFloat(svgEl.getAttribute('height')) || 24;
+  svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  return { x: 0, y: 0, w, h };
+}
+
+function getContentBBox(svgString) {
+  // Render in sandbox, get the bounding box of all visible content
+  const sandbox = document.getElementById('svg-sandbox');
+  sandbox.innerHTML = svgString;
+  const liveSvg = sandbox.querySelector('svg');
+  if (!liveSvg) return null;
+
+  // Force a display size so layout is computed
+  liveSvg.removeAttribute('width');
+  liveSvg.removeAttribute('height');
+  liveSvg.style.width = '200px';
+  liveSvg.style.height = '200px';
+
+  // Ensure viewBox exists
+  const vbInfo = ensureViewBox(liveSvg);
+
+  // Create a temporary g containing all drawable children
+  const tempG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const drawable = Array.from(liveSvg.childNodes).filter(n => {
+    if (n.nodeType !== 1) return false;
+    const tag = n.tagName.toLowerCase();
+    return tag !== 'defs' && tag !== 'title' && tag !== 'desc' && tag !== 'metadata';
+  });
+
+  drawable.forEach(child => tempG.appendChild(child.cloneNode(true)));
+  liveSvg.appendChild(tempG);
+
+  let bbox = null;
+  try {
+    bbox = tempG.getBBox();
+  } catch (e) { /* getBBox not available */ }
+
+  liveSvg.removeChild(tempG);
+  sandbox.innerHTML = '';
+
+  if (!bbox || bbox.width === 0 || bbox.height === 0) {
+    // Fallback: use viewBox dimensions
+    return { x: vbInfo.x, y: vbInfo.y, width: vbInfo.w, height: vbInfo.h, vbInfo };
+  }
+
+  return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height, vbInfo };
+}
+
+function detectKeyline(svgString, bbox) {
+  // Quick check for circle/ellipse as dominant element
+  const sandbox = document.getElementById('svg-sandbox');
+  sandbox.innerHTML = svgString;
+  const liveSvg = sandbox.querySelector('svg');
+  let hasCircleShape = false;
+  if (liveSvg) {
+    const circles = liveSvg.querySelectorAll('circle, ellipse');
+    const otherShapes = liveSvg.querySelectorAll('path, rect, line, polyline, polygon');
+    // If there are circles and no (or few) other shapes → circle keyline
+    if (circles.length > 0 && otherShapes.length === 0) hasCircleShape = true;
+    if (circles.length > 0 && otherShapes.length <= 1) hasCircleShape = true;
+  }
+  sandbox.innerHTML = '';
+
+  if (!bbox || bbox.width === 0 || bbox.height === 0) return 'square';
+
+  const ratio = bbox.width / bbox.height;
+  const isSquarish = Math.abs(ratio - 1) < 0.15;
+
+  if (isSquarish && hasCircleShape) return 'circle';
+  if (isSquarish) return 'square';
+  if (ratio < 0.85) return 'vertical';   // taller than wide
+  if (ratio > 1.15) return 'horizontal'; // wider than tall
+  return 'square';
+}
+
+function normalizeSVG(svgString, keyline, size) {
+  const { doc, root: svgEl } = parseSVGString(svgString);
+  const serializer = new XMLSerializer();
+
+  // Ensure viewBox
+  ensureViewBox(svgEl);
+
+  // Get content bounding box via sandbox render
+  const bboxData = getContentBBox(svgString);
+  if (!bboxData) throw new Error('Could not compute bounding box');
+
+  const { x: bx, y: by, width: bw, height: bh, vbInfo } = bboxData;
+
+  // Keyline dimensions for target size
+  const kl = SPEC.keylines[size][keyline];
+
+  // Scale factor: fit content bounding box into keyline bounds
+  const sx = kl.w / bw;
+  const sy = kl.h / bh;
+  const s = Math.min(sx, sy);
+
+  // After scale, content size in target dp space
+  const scaledW = bw * s;
+  const scaledH = bh * s;
+
+  // Translation to center in canvas (size × size)
+  const tx = size / 2 - (bx + bw / 2) * s;
+  const ty = size / 2 - (by + bh / 2) * s;
+
+  // ── Build output SVG ──
+  // Re-parse the original SVG cleanly
+  const { doc: outDoc, root: outSvg } = parseSVGString(svgString);
+
+  // Set canonical viewBox and dimensions
+  outSvg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  outSvg.setAttribute('width', String(size));
+  outSvg.setAttribute('height', String(size));
+  outSvg.setAttribute('fill', 'none');
+  outSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  outSvg.removeAttribute('class');
+  outSvg.removeAttribute('style');
+
+  // Collect non-defs children to move into content group
+  const childrenToWrap = Array.from(outSvg.childNodes).filter(n => {
+    if (n.nodeType !== 1) return false;
+    const tag = n.tagName.toLowerCase();
+    return tag !== 'defs' && tag !== 'title' && tag !== 'desc' && tag !== 'metadata';
+  });
+
+  // Create the content wrapper group (animation target for v2)
+  const contentG = outDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+  contentG.setAttribute('id', 'icon-content');
+  contentG.setAttribute(
+    'transform',
+    `translate(${tx.toFixed(4)},${ty.toFixed(4)}) scale(${s.toFixed(6)})`
+  );
+
+  childrenToWrap.forEach(child => contentG.appendChild(child));
+
+  // Apply stroke normalization
+  applyStrokeNorm(contentG);
+
+  outSvg.appendChild(contentG);
+
+  return serializer.serializeToString(outSvg);
+}
+
+function applyStrokeNorm(el) {
+  const STROKE_TAGS = new Set([
+    'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
+  ]);
+
+  function walk(node) {
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName ? node.tagName.toLowerCase() : '';
+
+    if (STROKE_TAGS.has(tag) || tag === 'g') {
+      const stroke = node.getAttribute('stroke');
+      const strokeWidth = node.getAttribute('stroke-width');
+
+      // Normalize if there's an explicit stroke or stroke-width set
+      if ((stroke && stroke !== 'none') || strokeWidth) {
+        if (stroke && stroke !== 'none') {
+          node.setAttribute('stroke-width', '1');
+          node.setAttribute('vector-effect', 'non-scaling-stroke');
+        } else if (strokeWidth) {
+          // Has stroke-width but no explicit stroke — might inherit stroke color
+          node.setAttribute('stroke-width', '1');
+          node.setAttribute('vector-effect', 'non-scaling-stroke');
+        }
+      }
+
+      // Handle inline style "stroke: ..." — convert to attributes
+      const style = node.getAttribute('style');
+      if (style && style.includes('stroke')) {
+        // Extract stroke from style and apply as attribute
+        const strokeMatch = style.match(/stroke\s*:\s*([^;]+)/);
+        const swMatch = style.match(/stroke-width\s*:\s*([^;]+)/);
+        if (strokeMatch && strokeMatch[1].trim() !== 'none') {
+          node.setAttribute('stroke', strokeMatch[1].trim());
+          node.setAttribute('stroke-width', '1');
+          node.setAttribute('vector-effect', 'non-scaling-stroke');
+          // Remove stroke from style to avoid conflicts
+          let newStyle = style
+            .replace(/stroke-width\s*:[^;]+;?/g, '')
+            .replace(/stroke\s*:[^;]+;?/g, '')
+            .trim();
+          if (newStyle) node.setAttribute('style', newStyle);
+          else node.removeAttribute('style');
+        }
+      }
+    }
+
+    Array.from(node.childNodes).forEach(walk);
+  }
+
+  walk(el);
+}
+
+// ═══════════════════════════════════════════════════════════
+// KEYLINE OVERLAY SVG (for the normalized preview)
+// ═══════════════════════════════════════════════════════════
+
+function buildKeylineOverlay(keyline, size) {
+  const kl = SPEC.keylines[size][keyline];
+  const pad = SPEC.padding[size];
+  const color = SPEC.keylineColors[keyline];
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Safe zone
+  const szX = pad;
+  const szY = pad;
+  const szW = size - pad * 2;
+  const szH = size - pad * 2;
+
+  let keylineShape = '';
+  if (keyline === 'circle') {
+    const r = kl.w / 2;
+    keylineShape = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}14" stroke="${color}" stroke-width="0.25" stroke-dasharray="0.7 0.4"/>`;
+  } else {
+    const klX = cx - kl.w / 2;
+    const klY = cy - kl.h / 2;
+    keylineShape = `<rect x="${klX}" y="${klY}" width="${kl.w}" height="${kl.h}" rx="0.5" fill="${color}14" stroke="${color}" stroke-width="0.25" stroke-dasharray="0.7 0.4"/>`;
+  }
+
+  return `
+    <rect x="0.1" y="0.1" width="${size - 0.2}" height="${size - 0.2}" fill="none" stroke="#c0c0c0" stroke-width="0.15"/>
+    <rect x="${szX}" y="${szY}" width="${szW}" height="${szH}" fill="none" stroke="#bbb" stroke-width="0.12" stroke-dasharray="0.5 0.4"/>
+    ${keylineShape}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROCESSING QUEUE
+// ═══════════════════════════════════════════════════════════
+
+async function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsText(file);
+  });
+}
+
+async function loadFileForProcessing(file) {
+  const panel = document.getElementById('process-panel');
+  const errDiv = document.getElementById('proc-error');
+  errDiv.classList.remove('visible');
+
+  try {
+    const svgString = await readFileAsText(file);
+    // Validate
+    parseSVGString(svgString);
+
+    state.currentRawSvg = svgString;
+
+    // Show original preview
+    const originalPreview = document.getElementById('original-preview');
+    originalPreview.innerHTML = '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = svgString;
+    const svgEl = tempDiv.querySelector('svg');
+    if (svgEl) {
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+      svgEl.style.width = '65%';
+      svgEl.style.height = '65%';
+      originalPreview.appendChild(svgEl);
+    }
+
+    // Get bbox and detect keyline
+    const bbox = getContentBBox(svgString);
+    const detected = detectKeyline(svgString, bbox);
+    state.currentKeyline = detected;
+    state.currentSize = 24;
+
+    // Populate UI
+    const filename = file.name.replace('.svg', '');
+    document.getElementById('icon-name').value = filename;
+    document.getElementById('panel-filename').textContent = filename;
+
+    // Bbox info
+    if (bbox) {
+      const ratio = (bbox.width / bbox.height).toFixed(2);
+      document.getElementById('original-info').textContent =
+        `${bbox.width.toFixed(1)} × ${bbox.height.toFixed(1)} (ratio ${ratio})`;
+    }
+
+    // Set keyline buttons
+    updateKeylineButtons(detected);
+    updateSizeButtons(24);
+
+    // Normalize + preview
+    await updateNormalizedPreview();
+
+    panel.classList.add('visible');
+    document.getElementById('save-btn').disabled = false;
+
+  } catch (e) {
+    errDiv.textContent = e.message || 'Could not process SVG';
+    errDiv.classList.add('visible');
+    panel.classList.add('visible');
+    document.getElementById('save-btn').disabled = true;
+    console.error(e);
+  }
+}
+
+async function updateNormalizedPreview() {
+  if (!state.currentRawSvg) return;
+
+  const normLayer = document.getElementById('norm-icon-layer');
+  const overlayEl = document.getElementById('norm-overlay-layer');
+  const normInfo = document.getElementById('norm-info');
+
+  try {
+    const normalized = normalizeSVG(state.currentRawSvg, state.currentKeyline, state.currentSize);
+    state.currentNormalizedSvg = normalized;
+
+    // Show normalized icon
+    normLayer.innerHTML = normalized;
+    const normSvg = normLayer.querySelector('svg');
+    if (normSvg) {
+      normSvg.removeAttribute('width');
+      normSvg.removeAttribute('height');
+      normSvg.style.width = '100%';
+      normSvg.style.height = '100%';
+    }
+
+    // Update overlay
+    overlayEl.setAttribute('viewBox', `0 0 ${state.currentSize} ${state.currentSize}`);
+    overlayEl.innerHTML = buildKeylineOverlay(state.currentKeyline, state.currentSize);
+    overlayEl.style.opacity = state.overlayVisible ? '1' : '0';
+
+    // Update info
+    const kl = SPEC.keylines[state.currentSize][state.currentKeyline];
+    const klLabel = state.currentKeyline === 'circle'
+      ? `${kl.w}dp ⌀`
+      : `${kl.w}×${kl.h}dp`;
+    normInfo.textContent = `· ${klLabel} keyline · ${state.currentSize}dp canvas`;
+
+    // Update size strip
+    renderSizeStrip(normalized);
+
+  } catch (e) {
+    const errDiv = document.getElementById('proc-error');
+    errDiv.textContent = 'Normalization error: ' + e.message;
+    errDiv.classList.add('visible');
+    state.currentNormalizedSvg = null;
+    document.getElementById('save-btn').disabled = true;
+    console.error(e);
+  }
+}
+
+function renderSizeStrip(normalizedSvg) {
+  const strip = document.getElementById('size-strip');
+  const SIZES = [16, 24, 32, 48, 64];
+
+  // Parse once and reuse the SVG, only changing display dimensions
+  const parser = new DOMParser();
+  const basePx = SIZES[0];
+
+  strip.innerHTML = '';
+  SIZES.forEach(px => {
+    const doc = parser.parseFromString(normalizedSvg, 'image/svg+xml');
+    const svg = doc.documentElement;
+    // Set explicit px dimensions; keep viewBox so it renders correctly
+    svg.setAttribute('width', px);
+    svg.setAttribute('height', px);
+    svg.style.display = 'block';
+    svg.style.flexShrink = '0';
+
+    const frame = document.createElement('div');
+    frame.className = 'icon-frame';
+    frame.style.width = px + 'px';
+    frame.style.height = px + 'px';
+    frame.appendChild(svg);
+
+    const label = document.createElement('span');
+    label.textContent = px + 'px';
+
+    const demo = document.createElement('div');
+    demo.className = 'size-demo';
+    demo.appendChild(frame);
+    demo.appendChild(label);
+    strip.appendChild(demo);
+  });
+}
+
+function updateKeylineButtons(selected) {
+  document.querySelectorAll('.keyline-btn').forEach(btn => {
+    const kl = btn.dataset.keyline;
+    btn.classList.remove('active', 'auto-detected');
+    if (kl === selected) {
+      btn.classList.add('active', 'auto-detected');
+    }
+  });
+}
+
+function updateSizeButtons(selected) {
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.size) === selected);
+  });
+}
+
+function processNextInQueue() {
+  const queueBar = document.getElementById('queue-bar');
+  const queue = state.queue;
+
+  if (state.queueIndex >= queue.length) {
+    // Done
+    queueBar.classList.remove('visible');
+    return;
+  }
+
+  // Update queue bar
+  document.getElementById('queue-text').textContent =
+    `Processing ${state.queueIndex + 1} of ${queue.length}`;
+  renderQueueDots();
+  queueBar.classList.add('visible');
+
+  loadFileForProcessing(queue[state.queueIndex]);
+}
+
+function renderQueueDots() {
+  const container = document.getElementById('queue-dots');
+  const queue = state.queue;
+  if (queue.length <= 1) { container.innerHTML = ''; return; }
+
+  container.innerHTML = queue.slice(0, Math.min(queue.length, 12)).map((_, i) => {
+    let cls = 'q-dot';
+    if (i < state.queueIndex) cls += ' done';
+    if (i === state.queueIndex) cls += ' active';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIBRARY RENDERING
+// ═══════════════════════════════════════════════════════════
+
+function renderLibrary() {
+  const grid = document.getElementById('library-grid');
+  const emptyState = document.getElementById('empty-state');
+  const count = document.getElementById('library-count');
+  const exportBtn = document.getElementById('export-zip-btn');
+
+  const filtered = state.filter === 'all'
+    ? state.library
+    : state.library.filter(ic => ic.keyline === state.filter);
+
+  count.textContent = `(${state.library.length} icon${state.library.length !== 1 ? 's' : ''})`;
+  exportBtn.disabled = state.library.length === 0;
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '';
+    emptyState.classList.add('visible');
+    emptyState.querySelector('p').textContent = state.library.length === 0
+      ? 'No icons yet. Upload SVG files above to get started.'
+      : `No icons with "${state.filter}" keyline.`;
+    return;
+  }
+
+  emptyState.classList.remove('visible');
+
+  grid.innerHTML = filtered.map(icon => {
+    const thumbSvg = icon.svgString
+      .replace(/width="\d+"/, 'width="38"')
+      .replace(/height="\d+"/, 'height="38"');
+    const isSelected = state.selectedIds.has(icon.id);
+
+    return `
+      <div class="icon-card${isSelected ? ' selected' : ''}" data-id="${icon.id}">
+        <button class="card-checkbox${isSelected ? ' checked' : ''}"
+          onclick="toggleSelection(event,'${icon.id}')"
+          title="Select for batch download">
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4l3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="card-actions">
+          <button class="card-action-btn" onclick="downloadIcon('${icon.id}')" title="Download all 3 sizes as ZIP">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v7M3 5l3 3 3-3M1 9v1a1 1 0 001 1h8a1 1 0 001-1V9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="card-action-btn delete" onclick="confirmDelete('${icon.id}')" title="Delete">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 3h8M5 1h2M4 3v7M8 3v7M3 3l.5 7h5l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="icon-thumb">${thumbSvg}</div>
+        <div class="icon-card-name">${escapeHTML(icon.name)}</div>
+        <span class="keyline-badge ${icon.keyline}">${icon.keyline}</span>
+        <span class="size-label">${icon.size}dp</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHTML(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOWNLOAD + EXPORT
+// ═══════════════════════════════════════════════════════════
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function addAllSizesToZip(zip, icon) {
+  // Re-normalize at all 3 sizes from the original SVG (or fallback to stored normalized)
+  const source = icon.originalSvg || icon.svgString;
+  [16, 24, 32].forEach(sz => {
+    try {
+      const svg = normalizeSVG(source, icon.keyline, sz);
+      zip.file(`${icon.name}/${icon.name}_${sz}dp.svg`, svg);
+    } catch (e) {
+      console.warn(`Could not generate ${sz}dp for ${icon.name}:`, e);
+    }
+  });
+}
+
+async function downloadIcon(id) {
+  const icon = state.library.find(ic => ic.id === id);
+  if (!icon) return;
+  if (typeof JSZip === 'undefined') {
+    showToast('JSZip not loaded', 'error');
+    return;
+  }
+  const zip = new JSZip();
+  addAllSizesToZip(zip, icon);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  triggerDownload(blob, `${icon.name}_${icon.keyline}.zip`);
+  showToast(`"${icon.name}" downloaded — 3 sizes`);
+}
+
+async function exportAllAsZip() {
+  if (state.library.length === 0) return;
+  if (typeof JSZip === 'undefined') {
+    showToast('JSZip not loaded. Check your internet connection.', 'error');
+    return;
+  }
+
+  const zip = new JSZip();
+  state.library.forEach(icon => addAllSizesToZip(zip, icon));
+
+  const btn = document.getElementById('export-zip-btn');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' });
+    triggerDownload(blob, `icons_${new Date().toISOString().slice(0,10)}.zip`);
+    showToast(`Exported ${state.library.length} icons (3 sizes each)`);
+  } catch (e) {
+    showToast('Export failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Export all as ZIP';
+    btn.disabled = state.library.length === 0;
+  }}
+
+function confirmDelete(id) {
+  const icon = state.library.find(ic => ic.id === id);
+  if (!icon) return;
+  if (confirm(`Delete "${icon.name}"?`)) {
+    state.selectedIds.delete(id);
+    updateSelectionBar();
+    deleteFromLibrary(id);
+  }
+}
+
+// ── Overlay toggle ──
+function setupOverlayToggle() {
+  document.getElementById('overlay-toggle').addEventListener('click', () => {
+    state.overlayVisible = !state.overlayVisible;
+    const btn = document.getElementById('overlay-toggle');
+    btn.classList.toggle('active', state.overlayVisible);
+    document.getElementById('norm-overlay-layer').style.opacity = state.overlayVisible ? '1' : '0';
+  });
+}
+
+// ── Selection + batch download ──
+function toggleSelection(event, id) {
+  event.stopPropagation();
+  if (state.selectedIds.has(id)) {
+    state.selectedIds.delete(id);
+  } else {
+    state.selectedIds.add(id);
+  }
+  // Update just this card without full re-render
+  const card = document.querySelector(`.icon-card[data-id="${id}"]`);
+  if (card) {
+    const isNowSelected = state.selectedIds.has(id);
+    card.classList.toggle('selected', isNowSelected);
+    const cb = card.querySelector('.card-checkbox');
+    if (cb) cb.classList.toggle('checked', isNowSelected);
+  }
+  updateSelectionBar();
+}
+
+function updateSelectionBar() {
+  const bar = document.getElementById('selection-bar');
+  const count = state.selectedIds.size;
+  if (count === 0) {
+    bar.classList.remove('visible');
+  } else {
+    bar.classList.add('visible');
+    document.getElementById('sel-count').textContent =
+      `${count} icon${count !== 1 ? 's' : ''} selected`;
+  }
+}
+
+function clearSelection() {
+  state.selectedIds.clear();
+  document.querySelectorAll('.icon-card.selected').forEach(card => {
+    card.classList.remove('selected');
+    const cb = card.querySelector('.card-checkbox');
+    if (cb) cb.classList.remove('checked');
+  });
+  updateSelectionBar();
+}
+
+async function downloadSelected() {
+  if (state.selectedIds.size === 0) return;
+  if (typeof JSZip === 'undefined') {
+    showToast('JSZip not loaded', 'error');
+    return;
+  }
+  const btn = document.getElementById('sel-download-btn');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+
+  try {
+    const zip = new JSZip();
+    const ids = Array.from(state.selectedIds);
+    ids.forEach(id => {
+      const icon = state.library.find(ic => ic.id === id);
+      if (icon) addAllSizesToZip(zip, icon);
+    });
+    const blob = await zip.generateAsync({ type: 'blob' });
+    triggerDownload(blob, `icons_selected_${new Date().toISOString().slice(0,10)}.zip`);
+    showToast(`Downloaded ${ids.length} icon${ids.length !== 1 ? 's' : ''} (3 sizes each)`);
+    clearSelection();
+  } catch (e) {
+    showToast('Download failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = '↓ Download (all 3 sizes)';
+    btn.disabled = false;
+  }
+}
+
+function setupSelectionBar() {
+  document.getElementById('sel-download-btn').addEventListener('click', downloadSelected);
+  document.getElementById('sel-clear-btn').addEventListener('click', clearSelection);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+
+let toastTimeout;
+function showToast(msg, type = 'default') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type !== 'default' ? type : '';
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EVENT WIRING
+// ═══════════════════════════════════════════════════════════
+
+function setupUploadZone() {
+  const dropArea = document.getElementById('drop-area');
+  const fileInput = document.getElementById('file-input');
+  const browseLink = document.getElementById('browse-link');
+
+  browseLink.addEventListener('click', () => fileInput.click());
+  dropArea.addEventListener('click', e => {
+    if (e.target !== browseLink) fileInput.click();
+  });
+
+  fileInput.addEventListener('change', e => {
+    handleFiles(Array.from(e.target.files));
+    fileInput.value = ''; // reset so same file can be re-uploaded
+  });
+
+  dropArea.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropArea.classList.add('drag-over');
+  });
+  dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
+  dropArea.addEventListener('drop', e => {
+    e.preventDefault();
+    dropArea.classList.remove('drag-over');
+    const svgFiles = Array.from(e.dataTransfer.files).filter(f =>
+      f.name.endsWith('.svg') || f.type === 'image/svg+xml'
+    );
+    if (svgFiles.length === 0) {
+      showToast('Please drop SVG files', 'error');
+      return;
+    }
+    handleFiles(svgFiles);
+  });
+}
+
+function handleFiles(files) {
+  const svgFiles = files.filter(f => f.name.endsWith('.svg') || f.type === 'image/svg+xml');
+  if (svgFiles.length === 0) {
+    showToast('No SVG files found', 'error');
+    return;
+  }
+  state.queue = svgFiles;
+  state.queueIndex = 0;
+  processNextInQueue();
+}
+
+function setupKeylineButtons() {
+  document.querySelectorAll('.keyline-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const kl = btn.dataset.keyline;
+      state.currentKeyline = kl;
+      // Remove auto-detected badge from all, mark selected
+      document.querySelectorAll('.keyline-btn').forEach(b => {
+        b.classList.remove('active', 'auto-detected');
+      });
+      btn.classList.add('active');
+      await updateNormalizedPreview();
+    });
+  });
+}
+
+function setupSizeButtons() {
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      state.currentSize = parseInt(btn.dataset.size);
+      updateSizeButtons(state.currentSize);
+      await updateNormalizedPreview();
+    });
+  });
+}
+
+function setupSaveButton() {
+  document.getElementById('save-btn').addEventListener('click', () => {
+    if (!state.currentNormalizedSvg) return;
+
+    const name = (document.getElementById('icon-name').value || 'icon').trim();
+    const icon = {
+      id: 'icon_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      name,
+      keyline: state.currentKeyline,
+      size: state.currentSize,
+      svgString: state.currentNormalizedSvg,
+      originalSvg: state.currentRawSvg,   // stored for multi-size re-export
+      createdAt: new Date().toISOString(),
+      animations: [], // v2 placeholder
+    };
+
+    addToLibrary(icon);
+    renderLibrary();
+    showToast(`"${name}" saved to library`, 'success');
+
+    // Advance queue
+    state.queueIndex++;
+    if (state.queueIndex < state.queue.length) {
+      processNextInQueue();
+    } else {
+      document.getElementById('queue-bar').classList.remove('visible');
+      document.getElementById('process-panel').classList.remove('visible');
+    }
+  });
+}
+
+function setupSkipButton() {
+  document.getElementById('skip-btn').addEventListener('click', () => {
+    state.queueIndex++;
+    document.getElementById('proc-error').classList.remove('visible');
+    if (state.queueIndex < state.queue.length) {
+      processNextInQueue();
+    } else {
+      document.getElementById('queue-bar').classList.remove('visible');
+      document.getElementById('process-panel').classList.remove('visible');
+    }
+  });
+}
+
+function setupFilterButtons() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.filter = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderLibrary();
+    });
+  });
+}
+
+function setupSpecToggle() {
+  const btn = document.getElementById('spec-toggle-btn');
+  const panel = document.getElementById('spec-panel');
+  btn.addEventListener('click', () => {
+    const isOpen = panel.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.querySelector('span') && (btn.querySelector('span').textContent = isOpen ? 'Hide spec' : 'Spec reference');
+  });
+}
+
+function setupExportButton() {
+  document.getElementById('export-zip-btn').addEventListener('click', exportAllAsZip);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+
+function init() {
+  loadLibrary();
+  setupUploadZone();
+  setupKeylineButtons();
+  setupSizeButtons();
+  setupSaveButton();
+  setupSkipButton();
+  setupFilterButtons();
+  setupSpecToggle();
+  setupExportButton();
+  setupOverlayToggle();
+  setupSelectionBar();
+  renderLibrary();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
