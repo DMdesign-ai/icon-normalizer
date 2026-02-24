@@ -772,9 +772,9 @@ header div p {
             <tr><th>Size</th><th>Circle</th><th>Square</th><th>Vertical</th><th>Horizontal</th></tr>
           </thead>
           <tbody>
-            <tr><td>16dp</td><td>14dp ⌀</td><td>11×11</td><td>10×12</td><td>12×10</td></tr>
+            <tr><td>16dp</td><td>14dp ⌀</td><td>12×12</td><td>10×14</td><td>14×10</td></tr>
             <tr><td>24dp</td><td>20dp ⌀</td><td>18×18</td><td>16×20</td><td>20×16</td></tr>
-            <tr><td>32dp</td><td>28dp ⌀</td><td>24×24</td><td>22×28</td><td>28×22</td></tr>
+            <tr><td>32dp</td><td>28dp ⌀</td><td>26×26</td><td>24×28</td><td>28×24</td></tr>
           </tbody>
         </table>
         <p style="font-size:11px;color:var(--secondary);margin-top:8px">Circle: circular icons · Square: geometric/square · Vertical: portrait (person, phone, door) · Horizontal: landscape (card, monitor)</p>
@@ -946,9 +946,9 @@ const SPEC = {
   keylines: {
     16: {
       circle:     { w: 14, h: 14 },
-      square:     { w: 11, h: 11 },
-      vertical:   { w: 10, h: 12 },  // 10dp wide × 12dp tall (portrait)
-      horizontal: { w: 12, h: 10 },  // 12dp wide × 10dp tall (landscape)
+      square:     { w: 12, h: 12 },
+      vertical:   { w: 10, h: 14 },  // 10dp wide × 14dp tall (portrait)
+      horizontal: { w: 14, h: 10 },  // 14dp wide × 10dp tall (landscape)
     },
     24: {
       circle:     { w: 20, h: 20 },
@@ -958,9 +958,9 @@ const SPEC = {
     },
     32: {
       circle:     { w: 28, h: 28 },
-      square:     { w: 24, h: 24 },
-      vertical:   { w: 22, h: 28 },  // 22dp wide × 28dp tall
-      horizontal: { w: 28, h: 22 },  // 28dp wide × 22dp tall
+      square:     { w: 26, h: 26 },
+      vertical:   { w: 24, h: 28 },  // 24dp wide × 28dp tall
+      horizontal: { w: 28, h: 24 },  // 28dp wide × 24dp tall
     },
   },
   padding: { 16: 1, 24: 2, 32: 2 },
