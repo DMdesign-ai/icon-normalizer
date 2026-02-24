@@ -740,7 +740,7 @@ header div p {
 <div id="app">
   <header>
     <div>
-      <h1>Icon Safe Area Normalizer <span style="font-size:11px;font-weight:400;color:var(--secondary);letter-spacing:0;margin-left:6px">v1.5</span></h1>
+      <h1>Icon Safe Area Normalizer <span style="font-size:11px;font-weight:400;color:var(--secondary);letter-spacing:0;margin-left:6px">v1.6</span></h1>
       <p>Upload SVGs → normalize strokes to 1dp → fit to keyline → save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1141,9 +1141,7 @@ function normalizeSVG(svgString, keyline, size) {
   const kl = SPEC.keylines[size][keyline];
 
   // Scale factor: fit content bounding box into keyline bounds.
-  // Subtract 1dp so the 0.5dp stroke overhang on each side lands exactly at
-  // the keyline edge (getBBox is geometric-only; stroke extends beyond it).
-  const strokeAllowance = 1; // 0.5dp stroke per side × 2 = 1dp; geometric content fills keyline−1, stroke edge lands at keyline
+  const strokeAllowance = 0; // scale to full keyline bounds
   const sx = (kl.w - strokeAllowance) / bw;
   const sy = (kl.h - strokeAllowance) / bh;
   const s = Math.min(sx, sy);
