@@ -1143,7 +1143,7 @@ function normalizeSVG(svgString, keyline, size) {
   // Scale factor: fit content bounding box into keyline bounds.
   // Subtract 1dp so the 0.5dp stroke overhang on each side lands exactly at
   // the keyline edge (getBBox is geometric-only; stroke extends beyond it).
-  const strokeAllowance = 1; // 0.5dp per side × 2 sides = 1dp total
+  const strokeAllowance = 0; // scale to full keyline bounds; 0.5dp stroke overhang is negligible at retina
   const sx = (kl.w - strokeAllowance) / bw;
   const sy = (kl.h - strokeAllowance) / bh;
   const s = Math.min(sx, sy);
