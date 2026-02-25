@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.10</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.11</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1174,18 +1174,26 @@ function shapeToPathD(el) {
   return '';
 }
 
-// Merge all shapes in contentG into flat compound paths grouped by (fill × stroke × stroke-width).
-// Removes all <g> wrappers; gives Figma a structure of icon-content > 1–N Vector(s).
-// Stroke-width is read from each shape's explicit attribute, its inline style, or the
-// contentG default — preserving the source design's intended line weight exactly.
-// s = coordinate scale factor (same value used in walkFlatten).
-// stroke-width is multiplied by s so the visual stroke-to-bar ratio stays
-// constant across all output sizes (16 / 24 / 32 dp).
+// Merge all shapes in contentG into flat compound paths grouped by style signature.
+// Removes all <g> wrappers → Figma sees: icon-content > 1–N <path> elements (flat Vectors).
+//
+// Key behaviour for inside-stroke shapes (the common Figma export pattern):
+//   Figma exports "Inside" stroke by doubling stroke-width + adding a clip-path.
+//   We remove clip-paths (v2.5). Without a clip-path the doubled stroke bleeds 0.5dp
+//   outside the shape boundary and looks visually heavier at larger sizes.
+//   Fix: for stroke-only closed simple shapes (rect / circle / ellipse), we convert
+//   to a filled evenodd "frame" path: outer boundary + inner boundary inset by 1dp.
+//   This perfectly replicates 1dp inside stroke with no outward bleed, and the
+//   visual weight is identical at 16, 24 and 32dp because 1 SVG unit = 1dp exactly.
+//
+// Open paths (lines, polylines) and filled shapes are left as-is with stroke-width="1".
 function flattenToCompoundPaths(contentG, s) {
   const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
+  // Inside-stroke visual weight in dp. With viewBox/width/height set to the canvas size,
+  // 1 SVG unit = 1dp, so SW=1 is always 1dp regardless of output size.
+  const SW = 1;
+
   // Default stroke to 'none' — do NOT fall back to 'currentColor'.
-  // Fill-only paths have no stroke in the original; defaulting to currentColor would
-  // add an unwanted outline on top of solid shapes.
   const cgStroke      = contentG.getAttribute('stroke')            || 'none';
   const cgFill        = contentG.getAttribute('fill')              || 'none';
   const cgStrokeWidth = contentG.getAttribute('stroke-width')      || '1';
@@ -1193,30 +1201,89 @@ function flattenToCompoundPaths(contentG, s) {
   const cgLinejoin    = contentG.getAttribute('stroke-linejoin')   || '';
   const cgMiterlimit  = contentG.getAttribute('stroke-miterlimit') || '';
 
-  // Read a CSS property from an element's inline style attribute
   function styleVal(node, prop) {
-    const s = node.getAttribute('style') || '';
-    const m = s.match(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;]+)'));
+    const sv = node.getAttribute('style') || '';
+    const m = sv.match(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;]+)'));
     return m ? m[1].trim() : '';
   }
 
-  // Collect every shape recursively (unwrapping groups implicitly)
+  // Build the path `d` for the INNER boundary of a closed simple shape inset by SW.
+  // Returns '' if the inner shape would collapse to zero or negative size.
+  function makeInnerD(node, tag) {
+    const f = v => parseFloat(v || '0');
+    const tmp = node.ownerDocument.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (tag === 'rect') {
+      const x = f(node.getAttribute('x')), y = f(node.getAttribute('y'));
+      const w = f(node.getAttribute('width')), h = f(node.getAttribute('height'));
+      const rxRaw = f(node.getAttribute('rx')), ryRaw = f(node.getAttribute('ry') || node.getAttribute('rx'));
+      const iw = w - 2 * SW, ih = h - 2 * SW;
+      if (iw <= 0 || ih <= 0) return '';
+      tmp.setAttribute('x',      x + SW);
+      tmp.setAttribute('y',      y + SW);
+      tmp.setAttribute('width',  iw);
+      tmp.setAttribute('height', ih);
+      tmp.setAttribute('rx', Math.max(rxRaw - SW, 0));
+      tmp.setAttribute('ry', Math.max(ryRaw - SW, 0));
+    } else if (tag === 'circle') {
+      const r = f(node.getAttribute('r'));
+      if (r - SW <= 0) return '';
+      tmp.setAttribute('cx', node.getAttribute('cx') || '0');
+      tmp.setAttribute('cy', node.getAttribute('cy') || '0');
+      tmp.setAttribute('r',  r - SW);
+    } else if (tag === 'ellipse') {
+      const rx = f(node.getAttribute('rx')), ry = f(node.getAttribute('ry'));
+      if (rx - SW <= 0 || ry - SW <= 0) return '';
+      tmp.setAttribute('cx', node.getAttribute('cx') || '0');
+      tmp.setAttribute('cy', node.getAttribute('cy') || '0');
+      tmp.setAttribute('rx', rx - SW);
+      tmp.setAttribute('ry', ry - SW);
+    }
+    return shapeToPathD(tmp);
+  }
+
   const items = [];
   function collect(node) {
     if (node.nodeType !== 1) return;
     const tag = node.tagName.toLowerCase();
     if (SHAPE_TAGS.has(tag)) {
+      const stroke      = node.getAttribute('stroke')            || styleVal(node, 'stroke')            || cgStroke;
+      const fill        = node.getAttribute('fill')              || styleVal(node, 'fill')              || cgFill;
+      const strokeWidth = node.getAttribute('stroke-width')      || styleVal(node, 'stroke-width')      || cgStrokeWidth;
+      const linecap     = node.getAttribute('stroke-linecap')    || styleVal(node, 'stroke-linecap')    || cgLinecap;
+      const linejoin    = node.getAttribute('stroke-linejoin')   || styleVal(node, 'stroke-linejoin')   || cgLinejoin;
+      const miterlimit  = node.getAttribute('stroke-miterlimit') || styleVal(node, 'stroke-miterlimit') || cgMiterlimit;
+
+      const hasStroke = stroke && stroke !== 'none';
+      const hasFill   = fill   && fill   !== 'none';
+
+      // ── Inside-stroke-to-fill conversion ──
+      // rect / circle / ellipse with stroke only (fill=none) are the closed simple shapes
+      // that Figma exports with inside stroke. Convert to a filled evenodd frame so the
+      // 1dp "stroke" lies fully inside the boundary with no outward bleed.
+      if (hasStroke && !hasFill && (tag === 'rect' || tag === 'circle' || tag === 'ellipse')) {
+        const outerD = shapeToPathD(node);
+        if (!outerD) return;
+        const innerD    = makeInnerD(node, tag);
+        const combinedD = innerD ? outerD + ' ' + innerD : outerD;
+        items.push({
+          d:           combinedD,
+          fill:        stroke,                      // stroke colour → fill colour
+          stroke:      'none',
+          fillRule:    innerD ? 'evenodd' : 'nonzero',
+          strokeWidth: '0',
+          linecap, linejoin, miterlimit,
+        });
+        return;
+      }
+
+      // ── Normal shape ── (open paths, filled shapes, complex closed paths)
       const d = shapeToPathD(node);
       if (!d) return;
-      // Resolve each attribute: explicit attribute → inline style → contentG default
       items.push({
         d,
-        stroke:      node.getAttribute('stroke')            || styleVal(node, 'stroke')       || cgStroke,
-        fill:        node.getAttribute('fill')              || styleVal(node, 'fill')         || cgFill,
-        strokeWidth: node.getAttribute('stroke-width')      || styleVal(node, 'stroke-width') || cgStrokeWidth,
-        linecap:     node.getAttribute('stroke-linecap')    || styleVal(node, 'stroke-linecap')   || cgLinecap,
-        linejoin:    node.getAttribute('stroke-linejoin')   || styleVal(node, 'stroke-linejoin')  || cgLinejoin,
-        miterlimit:  node.getAttribute('stroke-miterlimit') || styleVal(node, 'stroke-miterlimit') || cgMiterlimit,
+        stroke, fill, strokeWidth,
+        fillRule: 'nonzero',
+        linecap, linejoin, miterlimit,
       });
     } else {
       Array.from(node.childNodes).forEach(collect);
@@ -1225,15 +1292,14 @@ function flattenToCompoundPaths(contentG, s) {
   Array.from(contentG.childNodes).forEach(collect);
   if (!items.length) return;
 
-  // Group items by full style signature (including stroke-width)
+  // Group by full style signature (fillRule included so frame paths don't merge with other fills)
   const groups = new Map();
   items.forEach(it => {
-    const key = [it.stroke, it.fill, it.strokeWidth, it.linecap, it.linejoin, it.miterlimit].join('|');
+    const key = [it.stroke, it.fill, it.strokeWidth, it.linecap, it.linejoin, it.miterlimit, it.fillRule].join('|');
     if (!groups.has(key)) groups.set(key, { it, dParts: [] });
     groups.get(key).dParts.push(it.d);
   });
 
-  // Replace all children with merged paths; strip inherited attrs from contentG
   while (contentG.firstChild) contentG.removeChild(contentG.firstChild);
   ['stroke', 'fill', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'].forEach(a =>
     contentG.removeAttribute(a));
@@ -1241,19 +1307,17 @@ function flattenToCompoundPaths(contentG, s) {
   const ns = 'http://www.w3.org/2000/svg';
   groups.forEach(({ it, dParts }) => {
     const p = contentG.ownerDocument.createElementNS(ns, 'path');
-    p.setAttribute('d',    dParts.join(' '));
+    p.setAttribute('d', dParts.join(' '));
+    if (it.fillRule === 'evenodd') p.setAttribute('fill-rule', 'evenodd');
     p.setAttribute('fill', it.fill || 'none');
     if (it.stroke && it.stroke !== 'none') {
-      // Stroked path: force stroke-width="1" on all output sizes.
-      // viewBox="0 0 {size} {size}" + width/height={size} → 1 SVG unit = 1dp,
-      // so stroke-width="1" is always exactly 1dp in Figma at 16, 24, and 32dp.
+      // Open-path strokes (lines, open paths): always 1dp at every output size.
       p.setAttribute('stroke',       it.stroke);
       p.setAttribute('stroke-width', '1');
       if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
       if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
       if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
     } else {
-      // Fill-only path: explicitly mark stroke=none so no outline is added.
       p.setAttribute('stroke', 'none');
     }
     contentG.appendChild(p);
