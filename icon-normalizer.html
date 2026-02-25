@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v1.9</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.0</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1038,9 +1038,33 @@ function normalizeSVG(svgString, keyline, size) {
 
   childrenToWrap.forEach(child => contentG.appendChild(child));
 
+  // ── Move stroke presentation attributes from root SVG → contentG ──
+  // Many icon SVGs put stroke="currentColor" stroke-width="2" on the root <svg>.
+  // Those attributes are inherited by all descendants, including paths inside contentG.
+  // After scale(s), the inherited stroke-width would scale with the transform, producing
+  // wrong results. We move them to contentG so applyStrokeNorm can override them correctly.
+  const STROKE_INHERIT_ATTRS = [
+    'stroke', 'stroke-linecap', 'stroke-linejoin',
+    'stroke-miterlimit', 'stroke-opacity', 'stroke-dasharray', 'stroke-dashoffset',
+  ];
+  STROKE_INHERIT_ATTRS.forEach(attr => {
+    const val = outSvg.getAttribute(attr);
+    if (val && !contentG.hasAttribute(attr)) contentG.setAttribute(attr, val);
+    outSvg.removeAttribute(attr);
+  });
+  outSvg.removeAttribute('stroke-width'); // always clear — applyStrokeNorm sets correct value
+
+  // If there's a <style> block with stroke-width rules, update those too
+  const styleEl = outSvg.querySelector('style');
+  if (styleEl) {
+    styleEl.textContent = styleEl.textContent.replace(
+      /stroke-width\s*:\s*[^;!}]+/g,
+      `stroke-width: ${(1 / s).toFixed(6)}`
+    );
+  }
+
   // Apply stroke normalization — pass scale so stroke-width is set to 1/s,
   // making the effective stroke exactly 1dp after the group's scale(s) is applied.
-  // This works in all renderers (Figma strips vector-effect on import).
   applyStrokeNorm(contentG, s);
 
   outSvg.appendChild(contentG);
@@ -1048,45 +1072,53 @@ function normalizeSVG(svgString, keyline, size) {
   return serializer.serializeToString(outSvg);
 }
 
-// scale: the scale(s) applied to the content group.
-// We set stroke-width = 1/s so that after the group transform,
-// effective stroke = (1/s)*s = 1dp in the output SVG viewport.
-// This is renderer-agnostic — no vector-effect needed.
+// Sets stroke-width = 1/scale on every shape inside the content group,
+// so that after the group's scale(s) transform, effective stroke = 1dp
+// in all renderers (Figma, browsers, etc.).
 function applyStrokeNorm(el, scale) {
-  const sw = (1 / scale).toFixed(6); // pre-compensated stroke width
-  const STROKE_TAGS = new Set([
+  const sw = (1 / scale).toFixed(6);
+  const SHAPE_TAGS = new Set([
     'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
   ]);
+
+  // Set sw on the content group itself as the inherited default.
+  // This catches paths that have no explicit stroke-width attribute and
+  // would otherwise inherit from the (now-stripped) root SVG.
+  el.setAttribute('stroke-width', sw);
+  el.removeAttribute('vector-effect');
 
   function walk(node) {
     if (node.nodeType !== 1) return;
     const tag = node.tagName ? node.tagName.toLowerCase() : '';
 
-    if (STROKE_TAGS.has(tag) || tag === 'g') {
+    if (SHAPE_TAGS.has(tag)) {
       const stroke = node.getAttribute('stroke');
-      const strokeWidth = node.getAttribute('stroke-width');
 
-      if ((stroke && stroke !== 'none') || strokeWidth) {
+      // Only skip shapes that are explicitly stroked "none"
+      if (stroke !== 'none') {
         node.setAttribute('stroke-width', sw);
-        node.removeAttribute('vector-effect'); // not needed; explicit sw handles it
+        node.removeAttribute('vector-effect');
       }
 
-      // Handle inline style "stroke: ..." — convert to attributes
+      // Convert inline style stroke → attribute, strip stroke-width from style
       const style = node.getAttribute('style');
       if (style && style.includes('stroke')) {
-        const strokeMatch = style.match(/stroke\s*:\s*([^;]+)/);
+        const strokeMatch = style.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/);
         if (strokeMatch && strokeMatch[1].trim() !== 'none') {
           node.setAttribute('stroke', strokeMatch[1].trim());
           node.setAttribute('stroke-width', sw);
-          node.removeAttribute('vector-effect');
-          let newStyle = style
-            .replace(/stroke-width\s*:[^;]+;?/g, '')
-            .replace(/stroke\s*:[^;]+;?/g, '')
-            .trim();
-          if (newStyle) node.setAttribute('style', newStyle);
-          else node.removeAttribute('style');
         }
+        const cleaned = style
+          .replace(/stroke-width\s*:[^;]+;?/g, '')
+          .replace(/(?:^|;)\s*stroke\s*:[^;]+;?/g, '')
+          .trim().replace(/^;+|;+$/g, '');
+        if (cleaned) node.setAttribute('style', cleaned);
+        else node.removeAttribute('style');
       }
+    } else if (tag === 'g') {
+      // Groups: clear any explicit stroke-width so shapes inherit from contentG
+      node.removeAttribute('stroke-width');
+      node.removeAttribute('vector-effect');
     }
 
     Array.from(node.childNodes).forEach(walk);
