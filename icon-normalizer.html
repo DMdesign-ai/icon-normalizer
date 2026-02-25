@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.4</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.5</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1212,6 +1212,14 @@ function normalizeSVG(svgString, keyline, size) {
   applyStrokeNorm(contentG, 1.0);
 
   outSvg.appendChild(contentG);
+
+  // Remove all clip-path attributes and <clipPath> definitions.
+  // Icon SVG clip paths are typically just canvas-boundary clips — the viewBox handles this.
+  // Leaving them causes "Clip path group" layers in Figma and breaks rendering because
+  // the <clipPath> geometry lives in <defs> (unflattened, original coordinates) while
+  // the actual paths are now in dp space — the mismatch clips content incorrectly.
+  outSvg.querySelectorAll('[clip-path]').forEach(el => el.removeAttribute('clip-path'));
+  outSvg.querySelectorAll('clipPath').forEach(el => el.parentNode.removeChild(el));
 
   return serializer.serializeToString(outSvg);
 }
