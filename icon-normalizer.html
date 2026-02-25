@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.5</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.6</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1128,6 +1128,112 @@ function detectKeyline(svgString, bbox) {
   return 'square';
 }
 
+// Convert any SVG shape element to a path `d` string.
+// Assumes coordinates are already in their final (dp) space.
+function shapeToPathD(el) {
+  const tag = el.tagName.toLowerCase();
+  const f = v => parseFloat(v || 0);
+
+  if (tag === 'path') return el.getAttribute('d') || '';
+
+  if (tag === 'line') {
+    const x1 = f(el.getAttribute('x1')), y1 = f(el.getAttribute('y1'));
+    const x2 = f(el.getAttribute('x2')), y2 = f(el.getAttribute('y2'));
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
+  if (tag === 'rect') {
+    const x = f(el.getAttribute('x')), y = f(el.getAttribute('y'));
+    const w = f(el.getAttribute('width')), h = f(el.getAttribute('height'));
+    const rx = Math.min(f(el.getAttribute('rx')), w / 2);
+    const ry = Math.min(f(el.getAttribute('ry') || el.getAttribute('rx')), h / 2);
+    if (rx === 0 && ry === 0) return `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
+    return `M ${x + rx} ${y} H ${x + w - rx} A ${rx} ${ry} 0 0 1 ${x + w} ${y + ry} V ${y + h - ry} A ${rx} ${ry} 0 0 1 ${x + w - rx} ${y + h} H ${x + rx} A ${rx} ${ry} 0 0 1 ${x} ${y + h - ry} V ${y + ry} A ${rx} ${ry} 0 0 1 ${x + rx} ${y} Z`;
+  }
+
+  if (tag === 'circle') {
+    const cx = f(el.getAttribute('cx')), cy = f(el.getAttribute('cy'));
+    const r = f(el.getAttribute('r'));
+    return `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z`;
+  }
+
+  if (tag === 'ellipse') {
+    const cx = f(el.getAttribute('cx')), cy = f(el.getAttribute('cy'));
+    const rx2 = f(el.getAttribute('rx')), ry2 = f(el.getAttribute('ry'));
+    return `M ${cx - rx2} ${cy} A ${rx2} ${ry2} 0 1 0 ${cx + rx2} ${cy} A ${rx2} ${ry2} 0 1 0 ${cx - rx2} ${cy} Z`;
+  }
+
+  if (tag === 'polyline' || tag === 'polygon') {
+    const pts = (el.getAttribute('points') || '').trim().split(/[\s,]+/);
+    const pairs = [];
+    for (let i = 0; i + 1 < pts.length; i += 2) pairs.push(`${pts[i]} ${pts[i + 1]}`);
+    if (!pairs.length) return '';
+    const d = `M ${pairs.join(' L ')}`;
+    return tag === 'polygon' ? d + ' Z' : d;
+  }
+  return '';
+}
+
+// Merge all shapes in contentG into flat compound paths grouped by (fill × stroke).
+// Removes all <g> wrappers; gives Figma a structure of icon-content > 1–N Vector(s).
+function flattenToCompoundPaths(contentG) {
+  const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
+  const cgStroke     = contentG.getAttribute('stroke')           || 'currentColor';
+  const cgFill       = contentG.getAttribute('fill')             || 'none';
+  const cgLinecap    = contentG.getAttribute('stroke-linecap')   || '';
+  const cgLinejoin   = contentG.getAttribute('stroke-linejoin')  || '';
+  const cgMiterlimit = contentG.getAttribute('stroke-miterlimit') || '';
+
+  // Collect every shape recursively (unwrapping groups implicitly)
+  const items = [];
+  function collect(node) {
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (SHAPE_TAGS.has(tag)) {
+      const d = shapeToPathD(node);
+      if (!d) return;
+      items.push({
+        d,
+        stroke:     node.getAttribute('stroke')           || cgStroke,
+        fill:       node.getAttribute('fill')             || cgFill,
+        linecap:    node.getAttribute('stroke-linecap')   || cgLinecap,
+        linejoin:   node.getAttribute('stroke-linejoin')  || cgLinejoin,
+        miterlimit: node.getAttribute('stroke-miterlimit') || cgMiterlimit,
+      });
+    } else {
+      Array.from(node.childNodes).forEach(collect);
+    }
+  }
+  Array.from(contentG.childNodes).forEach(collect);
+  if (!items.length) return;
+
+  // Group items by style signature
+  const groups = new Map();
+  items.forEach(it => {
+    const key = [it.stroke, it.fill, it.linecap, it.linejoin, it.miterlimit].join('|');
+    if (!groups.has(key)) groups.set(key, { it, dParts: [] });
+    groups.get(key).dParts.push(it.d);
+  });
+
+  // Replace all children with merged paths; strip inherited attrs from contentG
+  while (contentG.firstChild) contentG.removeChild(contentG.firstChild);
+  ['stroke', 'fill', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit'].forEach(a =>
+    contentG.removeAttribute(a));
+
+  const ns = 'http://www.w3.org/2000/svg';
+  groups.forEach(({ it, dParts }) => {
+    const p = contentG.ownerDocument.createElementNS(ns, 'path');
+    p.setAttribute('d', dParts.join(' '));
+    p.setAttribute('fill',         it.fill || 'none');
+    p.setAttribute('stroke',       it.stroke);
+    p.setAttribute('stroke-width', '1');
+    if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
+    if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
+    if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
+    contentG.appendChild(p);
+  });
+}
+
 function normalizeSVG(svgString, keyline, size) {
   const { doc, root: svgEl } = parseSVGString(svgString);
   const serializer = new XMLSerializer();
@@ -1210,6 +1316,10 @@ function normalizeSVG(svgString, keyline, size) {
 
   // Set stroke-width=1 on every shape (1dp directly — no scaling math needed).
   applyStrokeNorm(contentG, 1.0);
+
+  // Merge all shapes into flat compound paths and remove all <g> wrappers.
+  // Result: icon-content → 1–N <path> elements. Figma shows a clean flat layer structure.
+  flattenToCompoundPaths(contentG);
 
   outSvg.appendChild(contentG);
 
