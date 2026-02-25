@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.2</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.3</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -879,6 +879,156 @@ function deleteFromLibrary(id) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// TRANSFORM MATH + PATH FLATTENING
+// ═══════════════════════════════════════════════════════════
+
+// Affine matrix: [a, b, c, d, e, f]  →  x' = a·x + c·y + e,  y' = b·x + d·y + f
+function matMul(p, q) {
+  return [
+    p[0]*q[0]+p[2]*q[1], p[1]*q[0]+p[3]*q[1],
+    p[0]*q[2]+p[2]*q[3], p[1]*q[2]+p[3]*q[3],
+    p[0]*q[4]+p[2]*q[5]+p[4], p[1]*q[4]+p[3]*q[5]+p[5],
+  ];
+}
+function matApply(m, x, y) { return [m[0]*x+m[2]*y+m[4], m[1]*x+m[3]*y+m[5]]; }
+function matScale(m) { return Math.sqrt(m[0]*m[0]+m[1]*m[1]); } // uniform scale magnitude
+
+function parseTransformStr(s) {
+  if (!s) return [1,0,0,1,0,0];
+  let m = [1,0,0,1,0,0];
+  const re = /(\w+)\s*\(([^)]*)\)/g;
+  let match;
+  while ((match = re.exec(s)) !== null) {
+    const fn = match[1];
+    const a = match[2].trim().split(/[\s,]+/).map(Number);
+    let t = [1,0,0,1,0,0];
+    if      (fn==='translate') t = [1,0,0,1,a[0]||0,a[1]||0];
+    else if (fn==='scale')     { const sx=a[0]||1,sy=a.length>1?a[1]:sx; t=[sx,0,0,sy,0,0]; }
+    else if (fn==='matrix')    t = a.slice(0,6);
+    else if (fn==='rotate') {
+      const ang=(a[0]||0)*Math.PI/180, cos=Math.cos(ang), sin=Math.sin(ang);
+      const cx=a[1]||0, cy=a[2]||0;
+      t = [cos, sin, -sin, cos, cx-cos*cx+sin*cy, cy-sin*cx-cos*cy];
+    }
+    m = matMul(m, t);
+  }
+  return m;
+}
+
+// Transform SVG path d attribute by matrix m
+function transformPathD(d, m) {
+  if (!d) return d;
+  const tokens = [];
+  const re = /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  let match;
+  while ((match = re.exec(d)) !== null)
+    tokens.push(match[1] !== undefined ? match[1] : parseFloat(match[2]));
+
+  const out = [];
+  let i = 0, cx = 0, cy = 0, sx = 0, sy = 0, prevCmd = 'M';
+  const n = () => tokens[i++];
+  const f = v => parseFloat(v.toFixed(4));
+
+  while (i < tokens.length) {
+    let cmd = typeof tokens[i] === 'string' ? (prevCmd = tokens[i++]) : prevCmd;
+    const C = cmd.toUpperCase(), rel = cmd !== C;
+
+    if (C === 'Z') { out.push('Z'); cx=sx; cy=sy; continue; }
+
+    if (C === 'M') {
+      let x=n(), y=n(); if (rel){x+=cx;y+=cy;}
+      const [nx,ny]=matApply(m,x,y); out.push(`M${f(nx)},${f(ny)}`);
+      cx=x;cy=y;sx=x;sy=y; prevCmd=rel?'l':'L';
+    } else if (C === 'L') {
+      let x=n(), y=n(); if (rel){x+=cx;y+=cy;}
+      const [nx,ny]=matApply(m,x,y); out.push(`L${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else if (C === 'H') {
+      let x=n(); if (rel) x+=cx;
+      const [nx,ny]=matApply(m,x,cy); out.push(`L${f(nx)},${f(ny)}`); cx=x;
+    } else if (C === 'V') {
+      let y=n(); if (rel) y+=cy;
+      const [nx,ny]=matApply(m,cx,y); out.push(`L${f(nx)},${f(ny)}`); cy=y;
+    } else if (C === 'C') {
+      let x1=n(),y1=n(),x2=n(),y2=n(),x=n(),y=n();
+      if (rel){x1+=cx;y1+=cy;x2+=cx;y2+=cy;x+=cx;y+=cy;}
+      const [a1,b1]=matApply(m,x1,y1),[a2,b2]=matApply(m,x2,y2),[nx,ny]=matApply(m,x,y);
+      out.push(`C${f(a1)},${f(b1)},${f(a2)},${f(b2)},${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else if (C === 'S') {
+      let x2=n(),y2=n(),x=n(),y=n(); if (rel){x2+=cx;y2+=cy;x+=cx;y+=cy;}
+      const [a2,b2]=matApply(m,x2,y2),[nx,ny]=matApply(m,x,y);
+      out.push(`S${f(a2)},${f(b2)},${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else if (C === 'Q') {
+      let x1=n(),y1=n(),x=n(),y=n(); if (rel){x1+=cx;y1+=cy;x+=cx;y+=cy;}
+      const [a1,b1]=matApply(m,x1,y1),[nx,ny]=matApply(m,x,y);
+      out.push(`Q${f(a1)},${f(b1)},${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else if (C === 'T') {
+      let x=n(),y=n(); if (rel){x+=cx;y+=cy;}
+      const [nx,ny]=matApply(m,x,y); out.push(`T${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else if (C === 'A') {
+      let rx=n(),ry=n(),rot=n(),la=n(),sw=n(),x=n(),y=n(); if (rel){x+=cx;y+=cy;}
+      const sc=matScale(m), [nx,ny]=matApply(m,x,y);
+      out.push(`A${f(rx*sc)},${f(ry*sc)},${rot},${la},${sw},${f(nx)},${f(ny)}`); cx=x;cy=y;
+    } else { while (i<tokens.length && typeof tokens[i]==='number') i++; }
+  }
+  return out.join(' ');
+}
+
+// Apply matrix m to element's own coordinates (shape elements only)
+const FLATTEN_TAGS = new Set(['path','line','circle','ellipse','rect','polyline','polygon']);
+function flattenElement(el, m) {
+  const tag = el.tagName.toLowerCase();
+  const f = v => parseFloat(v.toFixed(4));
+  const sc = matScale(m);
+  if (tag === 'path') {
+    const d = el.getAttribute('d'); if (d) el.setAttribute('d', transformPathD(d, m));
+  } else if (tag === 'line') {
+    const [nx1,ny1]=matApply(m,+(el.getAttribute('x1')||0),+(el.getAttribute('y1')||0));
+    const [nx2,ny2]=matApply(m,+(el.getAttribute('x2')||0),+(el.getAttribute('y2')||0));
+    el.setAttribute('x1',f(nx1));el.setAttribute('y1',f(ny1));
+    el.setAttribute('x2',f(nx2));el.setAttribute('y2',f(ny2));
+  } else if (tag === 'circle') {
+    const [nx,ny]=matApply(m,+(el.getAttribute('cx')||0),+(el.getAttribute('cy')||0));
+    el.setAttribute('cx',f(nx));el.setAttribute('cy',f(ny));
+    el.setAttribute('r',f(+(el.getAttribute('r')||0)*sc));
+  } else if (tag === 'ellipse') {
+    const [nx,ny]=matApply(m,+(el.getAttribute('cx')||0),+(el.getAttribute('cy')||0));
+    el.setAttribute('cx',f(nx));el.setAttribute('cy',f(ny));
+    el.setAttribute('rx',f(+(el.getAttribute('rx')||0)*sc));
+    el.setAttribute('ry',f(+(el.getAttribute('ry')||0)*sc));
+  } else if (tag === 'rect') {
+    const [nx,ny]=matApply(m,+(el.getAttribute('x')||0),+(el.getAttribute('y')||0));
+    el.setAttribute('x',f(nx));el.setAttribute('y',f(ny));
+    el.setAttribute('width',f(+(el.getAttribute('width')||0)*sc));
+    el.setAttribute('height',f(+(el.getAttribute('height')||0)*sc));
+    const rx=el.getAttribute('rx'),ry=el.getAttribute('ry');
+    if (rx) el.setAttribute('rx',f(+rx*sc));
+    if (ry) el.setAttribute('ry',f(+ry*sc));
+  } else if (tag === 'polyline' || tag === 'polygon') {
+    const pts=(el.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number);
+    const out=[];
+    for (let k=0;k<pts.length-1;k+=2){const[nx,ny]=matApply(m,pts[k],pts[k+1]);out.push(`${f(nx)},${f(ny)}`);}
+    el.setAttribute('points',out.join(' '));
+  }
+  el.removeAttribute('transform');
+}
+
+// Recursively walk SVG tree, accumulate group transforms, flatten each shape into parentMat space
+function walkFlatten(node, parentMat) {
+  if (node.nodeType !== 1) return;
+  const tag = node.tagName.toLowerCase();
+  if (FLATTEN_TAGS.has(tag)) {
+    const elMat = parseTransformStr(node.getAttribute('transform'));
+    flattenElement(node, matMul(parentMat, elMat));
+  } else {
+    const groupMat = (tag === 'g' || tag === 'svg')
+      ? matMul(parentMat, parseTransformStr(node.getAttribute('transform')))
+      : parentMat;
+    if (tag === 'g') node.removeAttribute('transform');
+    Array.from(node.childNodes).forEach(child => walkFlatten(child, groupMat));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // SVG PARSING + NORMALIZATION
 // ═══════════════════════════════════════════════════════════
 
@@ -999,25 +1149,18 @@ function normalizeSVG(svgString, keyline, size) {
   const sy = kl.h / bh;
   const s = Math.min(sx, sy);
 
-  // ── Compute output viewBox + centering translate ──
-  // Strategy: viewBox = "0 0 vbSide vbSide" (always non-negative, avoids Figma placement bugs)
-  //           <g transform="translate(gTx, gTy)"> moves source content to centre of viewBox.
-  //
-  // ViewBox scale = size / vbSide = s  → Figma applies this to stroke-width (guaranteed).
-  // Translate on the group does NOT affect stroke-width.
-  // No scale on any group → no renderer ambiguity about stroke scaling.
-  //
-  // Effective stroke = (1/s source units) × (viewBox scale s) = 1dp. ✓
-  const vbSide = size / s;                       // viewBox side in source coordinate units
-  const gTx   = vbSide / 2 - (bx + bw / 2);    // translate: centre content in viewBox
-  const gTy   = vbSide / 2 - (by + bh / 2);
+  // Translation to centre content in the canvas
+  const tx = size / 2 - (bx + bw / 2) * s;
+  const ty = size / 2 - (by + bh / 2) * s;
 
   // ── Build output SVG ──
   // Re-parse the original SVG cleanly
   const { doc: outDoc, root: outSvg } = parseSVGString(svgString);
 
-  // Set canonical viewBox and dimensions
-  outSvg.setAttribute('viewBox', `0 0 ${vbSide.toFixed(4)} ${vbSide.toFixed(4)}`);
+  // viewBox = "0 0 size size" — 1 SVG unit = 1dp exactly.
+  // All path coordinates will be flattened into this dp space,
+  // so stroke-width="1" = 1dp directly. No renderer ambiguity.
+  outSvg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   outSvg.setAttribute('width', String(size));
   outSvg.setAttribute('height', String(size));
   outSvg.setAttribute('fill', 'none');
@@ -1033,11 +1176,9 @@ function normalizeSVG(svgString, keyline, size) {
     return tag !== 'defs' && tag !== 'title' && tag !== 'desc' && tag !== 'metadata';
   });
 
-  // Content group: translate-only (no scale) to centre content in the viewBox.
-  // The viewBox provides all the scaling; a translate never affects stroke-width.
+  // Content group — no transform; coordinates are flattened into dp space below.
   const contentG = outDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
   contentG.setAttribute('id', 'icon-content');
-  contentG.setAttribute('transform', `translate(${gTx.toFixed(4)},${gTy.toFixed(4)})`);
 
   childrenToWrap.forEach(child => contentG.appendChild(child));
 
@@ -1057,18 +1198,21 @@ function normalizeSVG(svgString, keyline, size) {
   });
   outSvg.removeAttribute('stroke-width'); // always clear — applyStrokeNorm sets correct value
 
-  // If there's a <style> block with stroke-width rules, update those too
+  // If there's a <style> block with stroke-width rules, normalize those to 1 too.
   const styleEl = outSvg.querySelector('style');
   if (styleEl) {
     styleEl.textContent = styleEl.textContent.replace(
-      /stroke-width\s*:\s*[^;!}]+/g,
-      `stroke-width: ${(1 / s).toFixed(6)}`
+      /stroke-width\s*:\s*[^;!}]+/g, 'stroke-width: 1'
     );
   }
 
-  // Apply stroke normalization — stroke-width = 1/s in source units.
-  // viewBox scale s maps that to exactly 1dp in all renderers.
-  applyStrokeNorm(contentG, s);
+  // Flatten all shape coordinates into dp space using the outer matrix [s,0,0,s,tx,ty].
+  // After flattening: all coordinates are in [0,size] dp range, no transforms remain.
+  // stroke-width="1" then means exactly 1dp — no renderer can misinterpret it.
+  walkFlatten(contentG, [s, 0, 0, s, tx, ty]);
+
+  // Set stroke-width=1 on every shape (1dp directly — no scaling math needed).
+  applyStrokeNorm(contentG, 1.0);
 
   outSvg.appendChild(contentG);
 
