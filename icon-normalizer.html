@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.3</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.4</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1182,6 +1182,11 @@ function normalizeSVG(svgString, keyline, size) {
 
   childrenToWrap.forEach(child => contentG.appendChild(child));
 
+  // Remove <style> blocks — they contain CSS width/height/stroke-width rules that
+  // override our normalized presentation attributes in Figma and browsers.
+  // All styling is now applied directly as SVG attributes, so <style> is not needed.
+  contentG.querySelectorAll('style').forEach(s => s.parentNode.removeChild(s));
+
   // ── Move stroke presentation attributes from root SVG → contentG ──
   // Many icon SVGs put stroke="currentColor" stroke-width="2" on the root <svg>.
   // Those attributes are inherited by all descendants, including paths inside contentG.
@@ -1197,14 +1202,6 @@ function normalizeSVG(svgString, keyline, size) {
     outSvg.removeAttribute(attr);
   });
   outSvg.removeAttribute('stroke-width'); // always clear — applyStrokeNorm sets correct value
-
-  // If there's a <style> block with stroke-width rules, normalize those to 1 too.
-  const styleEl = outSvg.querySelector('style');
-  if (styleEl) {
-    styleEl.textContent = styleEl.textContent.replace(
-      /stroke-width\s*:\s*[^;!}]+/g, 'stroke-width: 1'
-    );
-  }
 
   // Flatten all shape coordinates into dp space using the outer matrix [s,0,0,s,tx,ty].
   // After flattening: all coordinates are in [0,size] dp range, no transforms remain.
