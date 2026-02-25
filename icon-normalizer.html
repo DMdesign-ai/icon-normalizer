@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.1</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.2</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -999,29 +999,25 @@ function normalizeSVG(svgString, keyline, size) {
   const sy = kl.h / bh;
   const s = Math.min(sx, sy);
 
-  // ── Compute output viewBox ──
-  // Use viewBox-based scaling instead of <g transform="scale(s)">.
-  // Figma (and all SVG renderers) apply viewBox scale to stroke-width — guaranteed.
-  // With a <g transform> approach, Figma bakes path coordinates but may not scale strokes.
+  // ── Compute output viewBox + centering translate ──
+  // Strategy: viewBox = "0 0 vbSide vbSide" (always non-negative, avoids Figma placement bugs)
+  //           <g transform="translate(gTx, gTy)"> moves source content to centre of viewBox.
   //
-  // Strategy: set viewBox so that 1 source unit = s dp (scale = size / vbSide = s).
-  // Center the content bbox at the middle of the output canvas.
+  // ViewBox scale = size / vbSide = s  → Figma applies this to stroke-width (guaranteed).
+  // Translate on the group does NOT affect stroke-width.
+  // No scale on any group → no renderer ambiguity about stroke scaling.
   //
-  //   vbSide = size/s          → viewBox side length in source units
-  //   vbx = cx_src - vbSide/2  → left edge of viewBox (centers content horizontally)
-  //   vby = cy_src - vbSide/2  → top  edge of viewBox (centers content vertically)
-  //
-  // Effective stroke = stroke_width_in_source × s. We set stroke_width = 1/s → 1dp. ✓
-  const vbSide = size / s;
-  const vbx = (bx + bw / 2) - vbSide / 2;
-  const vby = (by + bh / 2) - vbSide / 2;
+  // Effective stroke = (1/s source units) × (viewBox scale s) = 1dp. ✓
+  const vbSide = size / s;                       // viewBox side in source coordinate units
+  const gTx   = vbSide / 2 - (bx + bw / 2);    // translate: centre content in viewBox
+  const gTy   = vbSide / 2 - (by + bh / 2);
 
   // ── Build output SVG ──
   // Re-parse the original SVG cleanly
   const { doc: outDoc, root: outSvg } = parseSVGString(svgString);
 
   // Set canonical viewBox and dimensions
-  outSvg.setAttribute('viewBox', `${vbx.toFixed(4)} ${vby.toFixed(4)} ${vbSide.toFixed(4)} ${vbSide.toFixed(4)}`);
+  outSvg.setAttribute('viewBox', `0 0 ${vbSide.toFixed(4)} ${vbSide.toFixed(4)}`);
   outSvg.setAttribute('width', String(size));
   outSvg.setAttribute('height', String(size));
   outSvg.setAttribute('fill', 'none');
@@ -1037,9 +1033,11 @@ function normalizeSVG(svgString, keyline, size) {
     return tag !== 'defs' && tag !== 'title' && tag !== 'desc' && tag !== 'metadata';
   });
 
-  // Content wrapper group — no transform needed; viewBox handles positioning + scaling.
+  // Content group: translate-only (no scale) to centre content in the viewBox.
+  // The viewBox provides all the scaling; a translate never affects stroke-width.
   const contentG = outDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
   contentG.setAttribute('id', 'icon-content');
+  contentG.setAttribute('transform', `translate(${gTx.toFixed(4)},${gTy.toFixed(4)})`);
 
   childrenToWrap.forEach(child => contentG.appendChild(child));
 
