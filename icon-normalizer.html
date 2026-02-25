@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.6</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.7</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1174,15 +1174,25 @@ function shapeToPathD(el) {
   return '';
 }
 
-// Merge all shapes in contentG into flat compound paths grouped by (fill × stroke).
+// Merge all shapes in contentG into flat compound paths grouped by (fill × stroke × stroke-width).
 // Removes all <g> wrappers; gives Figma a structure of icon-content > 1–N Vector(s).
+// Stroke-width is read from each shape's explicit attribute, its inline style, or the
+// contentG default — preserving the source design's intended line weight exactly.
 function flattenToCompoundPaths(contentG) {
   const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
-  const cgStroke     = contentG.getAttribute('stroke')           || 'currentColor';
-  const cgFill       = contentG.getAttribute('fill')             || 'none';
-  const cgLinecap    = contentG.getAttribute('stroke-linecap')   || '';
-  const cgLinejoin   = contentG.getAttribute('stroke-linejoin')  || '';
-  const cgMiterlimit = contentG.getAttribute('stroke-miterlimit') || '';
+  const cgStroke      = contentG.getAttribute('stroke')            || 'currentColor';
+  const cgFill        = contentG.getAttribute('fill')              || 'none';
+  const cgStrokeWidth = contentG.getAttribute('stroke-width')      || '1';
+  const cgLinecap     = contentG.getAttribute('stroke-linecap')    || '';
+  const cgLinejoin    = contentG.getAttribute('stroke-linejoin')   || '';
+  const cgMiterlimit  = contentG.getAttribute('stroke-miterlimit') || '';
+
+  // Read a CSS property from an element's inline style attribute
+  function styleVal(node, prop) {
+    const s = node.getAttribute('style') || '';
+    const m = s.match(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;]+)'));
+    return m ? m[1].trim() : '';
+  }
 
   // Collect every shape recursively (unwrapping groups implicitly)
   const items = [];
@@ -1192,13 +1202,15 @@ function flattenToCompoundPaths(contentG) {
     if (SHAPE_TAGS.has(tag)) {
       const d = shapeToPathD(node);
       if (!d) return;
+      // Resolve each attribute: explicit attribute → inline style → contentG default
       items.push({
         d,
-        stroke:     node.getAttribute('stroke')           || cgStroke,
-        fill:       node.getAttribute('fill')             || cgFill,
-        linecap:    node.getAttribute('stroke-linecap')   || cgLinecap,
-        linejoin:   node.getAttribute('stroke-linejoin')  || cgLinejoin,
-        miterlimit: node.getAttribute('stroke-miterlimit') || cgMiterlimit,
+        stroke:      node.getAttribute('stroke')            || styleVal(node, 'stroke')       || cgStroke,
+        fill:        node.getAttribute('fill')              || styleVal(node, 'fill')         || cgFill,
+        strokeWidth: node.getAttribute('stroke-width')      || styleVal(node, 'stroke-width') || cgStrokeWidth,
+        linecap:     node.getAttribute('stroke-linecap')    || styleVal(node, 'stroke-linecap')   || cgLinecap,
+        linejoin:    node.getAttribute('stroke-linejoin')   || styleVal(node, 'stroke-linejoin')  || cgLinejoin,
+        miterlimit:  node.getAttribute('stroke-miterlimit') || styleVal(node, 'stroke-miterlimit') || cgMiterlimit,
       });
     } else {
       Array.from(node.childNodes).forEach(collect);
@@ -1207,10 +1219,10 @@ function flattenToCompoundPaths(contentG) {
   Array.from(contentG.childNodes).forEach(collect);
   if (!items.length) return;
 
-  // Group items by style signature
+  // Group items by full style signature (including stroke-width)
   const groups = new Map();
   items.forEach(it => {
-    const key = [it.stroke, it.fill, it.linecap, it.linejoin, it.miterlimit].join('|');
+    const key = [it.stroke, it.fill, it.strokeWidth, it.linecap, it.linejoin, it.miterlimit].join('|');
     if (!groups.has(key)) groups.set(key, { it, dParts: [] });
     groups.get(key).dParts.push(it.d);
   });
@@ -1223,10 +1235,10 @@ function flattenToCompoundPaths(contentG) {
   const ns = 'http://www.w3.org/2000/svg';
   groups.forEach(({ it, dParts }) => {
     const p = contentG.ownerDocument.createElementNS(ns, 'path');
-    p.setAttribute('d', dParts.join(' '));
+    p.setAttribute('d',            dParts.join(' '));
     p.setAttribute('fill',         it.fill || 'none');
     p.setAttribute('stroke',       it.stroke);
-    p.setAttribute('stroke-width', '1');
+    p.setAttribute('stroke-width', it.strokeWidth);   // ← source value, NOT forced to "1"
     if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
     if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
     if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
@@ -1294,12 +1306,11 @@ function normalizeSVG(svgString, keyline, size) {
   contentG.querySelectorAll('style').forEach(s => s.parentNode.removeChild(s));
 
   // ── Move stroke presentation attributes from root SVG → contentG ──
-  // Many icon SVGs put stroke="currentColor" stroke-width="2" on the root <svg>.
-  // Those attributes are inherited by all descendants, including paths inside contentG.
-  // After scale(s), the inherited stroke-width would scale with the transform, producing
-  // wrong results. We move them to contentG so applyStrokeNorm can override them correctly.
+  // Many icon SVGs put stroke="currentColor" stroke-width="1.5" fill="none" on root <svg>.
+  // We move ALL of these to contentG so flattenToCompoundPaths can read the effective values
+  // and set them explicitly on each merged path (breaking the inheritance chain cleanly).
   const STROKE_INHERIT_ATTRS = [
-    'stroke', 'stroke-linecap', 'stroke-linejoin',
+    'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
     'stroke-miterlimit', 'stroke-opacity', 'stroke-dasharray', 'stroke-dashoffset',
   ];
   STROKE_INHERIT_ATTRS.forEach(attr => {
@@ -1307,15 +1318,10 @@ function normalizeSVG(svgString, keyline, size) {
     if (val && !contentG.hasAttribute(attr)) contentG.setAttribute(attr, val);
     outSvg.removeAttribute(attr);
   });
-  outSvg.removeAttribute('stroke-width'); // always clear — applyStrokeNorm sets correct value
 
   // Flatten all shape coordinates into dp space using the outer matrix [s,0,0,s,tx,ty].
-  // After flattening: all coordinates are in [0,size] dp range, no transforms remain.
-  // stroke-width="1" then means exactly 1dp — no renderer can misinterpret it.
+  // Stroke-width is intentionally NOT changed — the source value is preserved exactly.
   walkFlatten(contentG, [s, 0, 0, s, tx, ty]);
-
-  // Set stroke-width=1 on every shape (1dp directly — no scaling math needed).
-  applyStrokeNorm(contentG, 1.0);
 
   // Merge all shapes into flat compound paths and remove all <g> wrappers.
   // Result: icon-content → 1–N <path> elements. Figma shows a clean flat layer structure.
