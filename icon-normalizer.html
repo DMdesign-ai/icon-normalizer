@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.9</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.10</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1244,14 +1244,11 @@ function flattenToCompoundPaths(contentG, s) {
     p.setAttribute('d',    dParts.join(' '));
     p.setAttribute('fill', it.fill || 'none');
     if (it.stroke && it.stroke !== 'none') {
-      // Stroked path: preserve color, scale stroke-width proportionally.
-      // Coordinates have been scaled by s (walkFlatten), so a source stroke-width
-      // of 1 at the original size becomes s dp in the output — preserving the
-      // visual stroke-to-bar ratio across all three output sizes.
-      const srcSW = parseFloat(it.strokeWidth) || 1;
-      const outSW = (srcSW * s).toFixed(4);
+      // Stroked path: force stroke-width="1" on all output sizes.
+      // viewBox="0 0 {size} {size}" + width/height={size} → 1 SVG unit = 1dp,
+      // so stroke-width="1" is always exactly 1dp in Figma at 16, 24, and 32dp.
       p.setAttribute('stroke',       it.stroke);
-      p.setAttribute('stroke-width', outSW);
+      p.setAttribute('stroke-width', '1');
       if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
       if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
       if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
