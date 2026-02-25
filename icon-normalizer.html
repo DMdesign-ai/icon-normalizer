@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.7</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.8</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1180,7 +1180,10 @@ function shapeToPathD(el) {
 // contentG default — preserving the source design's intended line weight exactly.
 function flattenToCompoundPaths(contentG) {
   const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
-  const cgStroke      = contentG.getAttribute('stroke')            || 'currentColor';
+  // Default stroke to 'none' — do NOT fall back to 'currentColor'.
+  // Fill-only paths have no stroke in the original; defaulting to currentColor would
+  // add an unwanted outline on top of solid shapes.
+  const cgStroke      = contentG.getAttribute('stroke')            || 'none';
   const cgFill        = contentG.getAttribute('fill')              || 'none';
   const cgStrokeWidth = contentG.getAttribute('stroke-width')      || '1';
   const cgLinecap     = contentG.getAttribute('stroke-linecap')    || '';
@@ -1235,13 +1238,21 @@ function flattenToCompoundPaths(contentG) {
   const ns = 'http://www.w3.org/2000/svg';
   groups.forEach(({ it, dParts }) => {
     const p = contentG.ownerDocument.createElementNS(ns, 'path');
-    p.setAttribute('d',            dParts.join(' '));
-    p.setAttribute('fill',         it.fill || 'none');
-    p.setAttribute('stroke',       it.stroke);
-    p.setAttribute('stroke-width', it.strokeWidth);   // ← source value, NOT forced to "1"
-    if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
-    if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
-    if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
+    p.setAttribute('d',    dParts.join(' '));
+    p.setAttribute('fill', it.fill || 'none');
+    if (it.stroke && it.stroke !== 'none') {
+      // Stroked path: preserve color, normalize weight to exactly 1dp.
+      // Coordinates are already in dp space (viewBox = 0 0 size size, 1 unit = 1dp),
+      // so stroke-width="1" is guaranteed to be 1dp in Figma at all three sizes.
+      p.setAttribute('stroke',       it.stroke);
+      p.setAttribute('stroke-width', '1');
+      if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
+      if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
+      if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
+    } else {
+      // Fill-only path: explicitly mark stroke=none so no outline is added.
+      p.setAttribute('stroke', 'none');
+    }
     contentG.appendChild(p);
   });
 }
@@ -1329,11 +1340,14 @@ function normalizeSVG(svgString, keyline, size) {
 
   outSvg.appendChild(contentG);
 
+  // Remove ALL <style> elements from the entire output SVG — including any inside <defs>.
+  // CSS width/height/stroke-width rules override SVG presentation attributes and cause
+  // Figma to create the wrong frame size, which scales the content and makes stroke-width="1"
+  // appear as a completely different value. The v2.4 fix only removed <style> from contentG;
+  // this catches any <style> that survived inside <defs>.
+  outSvg.querySelectorAll('style').forEach(s => s.parentNode.removeChild(s));
+
   // Remove all clip-path attributes and <clipPath> definitions.
-  // Icon SVG clip paths are typically just canvas-boundary clips — the viewBox handles this.
-  // Leaving them causes "Clip path group" layers in Figma and breaks rendering because
-  // the <clipPath> geometry lives in <defs> (unflattened, original coordinates) while
-  // the actual paths are now in dp space — the mismatch clips content incorrectly.
   outSvg.querySelectorAll('[clip-path]').forEach(el => el.removeAttribute('clip-path'));
   outSvg.querySelectorAll('clipPath').forEach(el => el.parentNode.removeChild(el));
 
