@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v2.11</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v3.0</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1174,6 +1174,74 @@ function shapeToPathD(el) {
   return '';
 }
 
+// Returns true if the path `d` string represents a closed shape (ends with Z/z).
+function isClosedPath(d) {
+  return /[Zz]\s*$/.test((d || '').trim());
+}
+
+// Compute the inner boundary of a closed path by scaling all coordinates toward the
+// path's bounding-box center, insetting by 1dp on each side. Uses transformPathD.
+function makeInnerDFromPath(outerD) {
+  const re = /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  let match, cx = 0, cy = 0, cmd = 'M';
+  const tokens = [];
+  while ((match = re.exec(outerD)) !== null)
+    tokens.push(match[1] !== undefined ? match[1] : parseFloat(match[2]));
+
+  const coords = [];
+  let i = 0;
+  while (i < tokens.length) {
+    if (typeof tokens[i] === 'string') { cmd = tokens[i++]; continue; }
+    const C = cmd.toUpperCase(), rel = cmd !== C;
+    if (C === 'Z') continue;
+    if (C === 'M' || C === 'L' || C === 'T') {
+      let x = tokens[i++], y = tokens[i++];
+      if (rel) { x += cx; y += cy; } cx = x; cy = y;
+      coords.push([cx, cy]);
+    } else if (C === 'H') {
+      let x = tokens[i++]; if (rel) x += cx; cx = x;
+      coords.push([cx, cy]);
+    } else if (C === 'V') {
+      let y = tokens[i++]; if (rel) y += cy; cy = y;
+      coords.push([cx, cy]);
+    } else if (C === 'C') {
+      for (let j = 0; j < 3; j++) {
+        let x = tokens[i++], y = tokens[i++];
+        if (rel) { x += cx; y += cy; }
+        coords.push([x, y]);
+        if (j === 2) { cx = x; cy = y; }
+      }
+    } else if (C === 'S' || C === 'Q') {
+      for (let j = 0; j < 2; j++) {
+        let x = tokens[i++], y = tokens[i++];
+        if (rel) { x += cx; y += cy; }
+        coords.push([x, y]);
+        if (j === 1) { cx = x; cy = y; }
+      }
+    } else if (C === 'A') {
+      i += 5; // skip rx, ry, rot, la, sw
+      let x = tokens[i++], y = tokens[i++];
+      if (rel) { x += cx; y += cy; } cx = x; cy = y;
+      coords.push([cx, cy]);
+    } else { i++; }
+  }
+
+  if (coords.length < 2) return '';
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  coords.forEach(([x, y]) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  });
+  const w = maxX - minX, h = maxY - minY;
+  if (w <= 2 || h <= 2) return ''; // inner shape would collapse
+
+  const cxB = minX + w / 2, cyB = minY + h / 2;
+  const sxF = (w - 2) / w, syF = (h - 2) / h; // inset by 1dp on each side
+  // Scale toward bbox center: x' = cx + (x - cx) * sx = sx*x + cx*(1-sx)
+  const mat = [sxF, 0, 0, syF, cxB * (1 - sxF), cyB * (1 - syF)];
+  return transformPathD(outerD, mat);
+}
+
 // Merge all shapes in contentG into flat compound paths grouped by style signature.
 // Removes all <g> wrappers → Figma sees: icon-content > 1–N <path> elements (flat Vectors).
 //
@@ -1181,10 +1249,10 @@ function shapeToPathD(el) {
 //   Figma exports "Inside" stroke by doubling stroke-width + adding a clip-path.
 //   We remove clip-paths (v2.5). Without a clip-path the doubled stroke bleeds 0.5dp
 //   outside the shape boundary and looks visually heavier at larger sizes.
-//   Fix: for stroke-only closed simple shapes (rect / circle / ellipse), we convert
-//   to a filled evenodd "frame" path: outer boundary + inner boundary inset by 1dp.
-//   This perfectly replicates 1dp inside stroke with no outward bleed, and the
-//   visual weight is identical at 16, 24 and 32dp because 1 SVG unit = 1dp exactly.
+//   Fix: for ALL stroke-only closed shapes (rect/circle/ellipse AND closed <path>),
+//   we convert to a filled evenodd "frame" path: outer boundary + inner boundary
+//   inset by 1dp. This perfectly replicates 1dp inside stroke with no outward bleed,
+//   and the visual weight is identical at 16, 24 and 32dp because 1 SVG unit = 1dp.
 //
 // Open paths (lines, polylines) and filled shapes are left as-is with stroke-width="1".
 function flattenToCompoundPaths(contentG, s) {
@@ -1257,13 +1325,15 @@ function flattenToCompoundPaths(contentG, s) {
       const hasFill   = fill   && fill   !== 'none';
 
       // ── Inside-stroke-to-fill conversion ──
-      // rect / circle / ellipse with stroke only (fill=none) are the closed simple shapes
-      // that Figma exports with inside stroke. Convert to a filled evenodd frame so the
-      // 1dp "stroke" lies fully inside the boundary with no outward bleed.
-      if (hasStroke && !hasFill && (tag === 'rect' || tag === 'circle' || tag === 'ellipse')) {
+      // Closed shapes with stroke only (fill=none) are converted to filled evenodd
+      // "frame" paths (outer + inner boundary inset by 1dp). This replicates a 1dp
+      // inside stroke with no outward bleed, giving identical visual weight at all sizes.
+      const isClosedSimple = tag === 'rect' || tag === 'circle' || tag === 'ellipse';
+      const isClosedPathEl = tag === 'path' && isClosedPath(shapeToPathD(node));
+      if (hasStroke && !hasFill && (isClosedSimple || isClosedPathEl)) {
         const outerD = shapeToPathD(node);
         if (!outerD) return;
-        const innerD    = makeInnerD(node, tag);
+        const innerD = isClosedSimple ? makeInnerD(node, tag) : makeInnerDFromPath(outerD);
         const combinedD = innerD ? outerD + ' ' + innerD : outerD;
         items.push({
           d:           combinedD,
@@ -1420,61 +1490,6 @@ function normalizeSVG(svgString, keyline, size) {
   outSvg.querySelectorAll('clipPath').forEach(el => el.parentNode.removeChild(el));
 
   return serializer.serializeToString(outSvg);
-}
-
-// Sets stroke-width = 1/scale on every shape inside the content group,
-// so that after the group's scale(s) transform, effective stroke = 1dp
-// in all renderers (Figma, browsers, etc.).
-function applyStrokeNorm(el, scale) {
-  const sw = (1 / scale).toFixed(6);
-  const SHAPE_TAGS = new Set([
-    'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
-  ]);
-
-  // Set sw on the content group itself as the inherited default.
-  // This catches paths that have no explicit stroke-width attribute and
-  // would otherwise inherit from the (now-stripped) root SVG.
-  el.setAttribute('stroke-width', sw);
-  el.removeAttribute('vector-effect');
-
-  function walk(node) {
-    if (node.nodeType !== 1) return;
-    const tag = node.tagName ? node.tagName.toLowerCase() : '';
-
-    if (SHAPE_TAGS.has(tag)) {
-      const stroke = node.getAttribute('stroke');
-
-      // Only skip shapes that are explicitly stroked "none"
-      if (stroke !== 'none') {
-        node.setAttribute('stroke-width', sw);
-        node.removeAttribute('vector-effect');
-      }
-
-      // Convert inline style stroke → attribute, strip stroke-width from style
-      const style = node.getAttribute('style');
-      if (style && style.includes('stroke')) {
-        const strokeMatch = style.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/);
-        if (strokeMatch && strokeMatch[1].trim() !== 'none') {
-          node.setAttribute('stroke', strokeMatch[1].trim());
-          node.setAttribute('stroke-width', sw);
-        }
-        const cleaned = style
-          .replace(/stroke-width\s*:[^;]+;?/g, '')
-          .replace(/(?:^|;)\s*stroke\s*:[^;]+;?/g, '')
-          .trim().replace(/^;+|;+$/g, '');
-        if (cleaned) node.setAttribute('style', cleaned);
-        else node.removeAttribute('style');
-      }
-    } else if (tag === 'g') {
-      // Groups: clear any explicit stroke-width so shapes inherit from contentG
-      node.removeAttribute('stroke-width');
-      node.removeAttribute('vector-effect');
-    }
-
-    Array.from(node.childNodes).forEach(walk);
-  }
-
-  walk(el);
 }
 
 // ═══════════════════════════════════════════════════════════
