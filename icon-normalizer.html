@@ -1383,10 +1383,14 @@ function flattenToCompoundPaths(contentG, s) {
   Array.from(contentG.childNodes).forEach(collect);
   if (!items.length) return;
 
-  // Group by full style signature (fillRule included so frame paths don't merge with other fills)
+  // Group by full style signature. Paths with the same signature share a single <path>.
+  // EXCEPT evenodd paths — merging evenodd sub-paths causes overlapping regions to cancel
+  // out (winding count 2 → unfilled). Each evenodd path stays as its own <path> element.
   const groups = new Map();
+  let eoCounter = 0;
   items.forEach(it => {
-    const key = [it.stroke, it.fill, it.strokeWidth, it.linecap, it.linejoin, it.miterlimit, it.fillRule].join('|');
+    const base = [it.stroke, it.fill, it.strokeWidth, it.linecap, it.linejoin, it.miterlimit, it.fillRule].join('|');
+    const key = it.fillRule === 'evenodd' ? base + '|eo' + (eoCounter++) : base;
     if (!groups.has(key)) groups.set(key, { it, dParts: [] });
     groups.get(key).dParts.push(it.d);
   });
