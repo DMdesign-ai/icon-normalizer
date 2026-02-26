@@ -588,7 +588,7 @@ header         { animation: fadeUp 0.55s ease-out both; }
   <header>
     <div>
       <span class="header-line"></span>
-      <h1>Icon Safe Area Normalizer <span class="v-badge">v3.0</span></h1>
+      <h1>Icon Safe Area Normalizer <span class="v-badge">v3.1</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
     <button id="spec-toggle-btn">
@@ -1346,13 +1346,34 @@ function flattenToCompoundPaths(contentG, s) {
         return;
       }
 
-      // ── Normal shape ── (open paths, filled shapes, complex closed paths)
+      // ── Filled paths: add compensating stroke to maintain ~1dp line width ──
+      // When geometry is scaled by s < 1, filled line widths become s dp.
+      // Adding a matching-colour stroke of (1−s) dp restores the visual width to ~1dp.
+      if (hasFill && !hasStroke) {
+        const d = shapeToPathD(node);
+        if (!d) return;
+        const compSW = Math.max(0, 1 - s);
+        items.push({
+          d,
+          fill,
+          stroke:      compSW > 0.001 ? fill : 'none',
+          strokeWidth: compSW > 0.001 ? String(parseFloat(compSW.toFixed(4))) : '0',
+          fillRule:    node.getAttribute('fill-rule') || 'nonzero',
+          linecap:     'butt',
+          linejoin:    'miter',
+          miterlimit:  '10',
+        });
+        return;
+      }
+
+      // ── Normal shape ── (open stroked paths, filled+stroked, etc.)
       const d = shapeToPathD(node);
       if (!d) return;
       items.push({
         d,
-        stroke, fill, strokeWidth,
-        fillRule: 'nonzero',
+        stroke, fill,
+        strokeWidth: hasStroke ? '1' : '0',   // normalize strokes to 1dp
+        fillRule: node.getAttribute('fill-rule') || 'nonzero',
         linecap, linejoin, miterlimit,
       });
     } else {
@@ -1381,9 +1402,8 @@ function flattenToCompoundPaths(contentG, s) {
     if (it.fillRule === 'evenodd') p.setAttribute('fill-rule', 'evenodd');
     p.setAttribute('fill', it.fill || 'none');
     if (it.stroke && it.stroke !== 'none') {
-      // Open-path strokes (lines, open paths): always 1dp at every output size.
       p.setAttribute('stroke',       it.stroke);
-      p.setAttribute('stroke-width', '1');
+      p.setAttribute('stroke-width', it.strokeWidth || '1');
       if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
       if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
       if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
