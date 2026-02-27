@@ -1331,7 +1331,7 @@ function makeInnerDFromPath(outerD) {
 // outward/inward by half the stroke-width. Returns a fill-only d-string.
 //   - Closed paths → evenodd ring (outer + reversed inner contours)
 //   - Open paths → single closed contour (outer → end cap → inner reversed → start cap)
-function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, sandbox) {
+function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, sandbox, outerOnly) {
   if (!pathD || strokeWidth < 0.001) return '';
 
   const ns = 'http://www.w3.org/2000/svg';
@@ -1415,18 +1415,21 @@ function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, san
     }
 
     if (closed) {
-      // Ring: outer contour + reversed inner contour (use with fill-rule="evenodd")
+      // Outer contour
       let d = `M${f(outerPts[0].x)},${f(outerPts[0].y)}`;
       for (let i = 1; i < outerPts.length; i++) {
         d += ` L${f(outerPts[i].x)},${f(outerPts[i].y)}`;
       }
       d += ' Z';
-      const last = innerPts.length - 1;
-      d += ` M${f(innerPts[last].x)},${f(innerPts[last].y)}`;
-      for (let i = last - 1; i >= 0; i--) {
-        d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
+      if (!outerOnly) {
+        // Full ring: add reversed inner contour (use with fill-rule="evenodd")
+        const last = innerPts.length - 1;
+        d += ` M${f(innerPts[last].x)},${f(innerPts[last].y)}`;
+        for (let i = last - 1; i >= 0; i--) {
+          d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
+        }
+        d += ' Z';
       }
-      d += ' Z';
       result = d;
     } else {
       // Open path: outer → end cap → inner reversed → start cap → close
@@ -1581,32 +1584,34 @@ function flattenToCompoundPaths(contentG, s) {
         return;
       }
 
-      // ── Filled paths: bake compensating stroke into fill geometry ──
+      // ── Filled paths: expand with outer contour of compensating stroke ──
       // When geometry is scaled by s < 1, filled line widths become s dp.
-      // We compute a stroke outline of (1−s) dp in the same colour and merge it
-      // with the original fill as a compound path (nonzero, overlap is harmless).
+      // We emit the original fill path + the OUTER contour of a (1−s) dp stroke
+      // as separate items. The outer contour overlaps the fill edge, so no gap
+      // appears (unlike a merged compound path which has anti-aliasing seams).
       if (hasFill && !hasStroke) {
         const d = shapeToPathD(node);
         if (!d) return;
         const compSW = Math.max(0, 1 - s);
         const sandbox = document.getElementById('svg-sandbox');
+        // Always emit the original fill path
+        items.push({
+          d, fill,
+          stroke: 'none', strokeWidth: '0',
+          fillRule: node.getAttribute('fill-rule') || 'nonzero',
+          linecap: '', linejoin: '', miterlimit: '',
+        });
+        // Add outer contour of compensating stroke (overlaps fill edge → no gap)
         if (compSW > 0.001) {
-          const strokeOutlineD = strokeToFillPath(d, compSW, 'butt', 'miter', '10', sandbox);
-          items.push({
-            d:           strokeOutlineD ? d + ' ' + strokeOutlineD : d,
-            fill,
-            stroke:      'none',
-            strokeWidth: '0',
-            fillRule:    node.getAttribute('fill-rule') || 'nonzero',
-            linecap: '', linejoin: '', miterlimit: '',
-          });
-        } else {
-          items.push({
-            d, fill,
-            stroke: 'none', strokeWidth: '0',
-            fillRule: node.getAttribute('fill-rule') || 'nonzero',
-            linecap: '', linejoin: '', miterlimit: '',
-          });
+          const outerD = strokeToFillPath(d, compSW, 'butt', 'miter', '10', sandbox, true);
+          if (outerD) {
+            items.push({
+              d: outerD, fill,
+              stroke: 'none', strokeWidth: '0',
+              fillRule: 'nonzero',
+              linecap: '', linejoin: '', miterlimit: '',
+            });
+          }
         }
         return;
       }

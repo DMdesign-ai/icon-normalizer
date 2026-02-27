@@ -56,37 +56,38 @@ async function exportIcons(nodes) {
   return icons;
 }
 
-// ─── Stroke Outlining ────────────────────────────────────
+// ─── Outline & Flatten ──────────────────────────────────
 
-// Walk a node tree and outline all strokes, converting them to fills.
-// This ensures the final output has no stroke attributes — all geometry is fill-only.
-function outlineAllStrokes(parent) {
-  const children = 'children' in parent ? [...parent.children] : [];
-  for (const child of children) {
-    // Recurse into groups/frames first
-    if ('children' in child && child.type !== 'VECTOR' && child.type !== 'BOOLEAN_OPERATION') {
-      outlineAllStrokes(child);
-    }
-
-    // Outline strokes on vector-like nodes
-    if ('strokes' in child && child.strokes && child.strokes.length > 0) {
-      try {
-        const outlined = child.outlineStroke();
-        if (outlined) {
-          // outlineStroke() replaces the original node with a new node
-          // that has the stroke converted to a fill path.
-          // If the result is a boolean/group, flatten it to a single vector.
-          if (outlined.type === 'BOOLEAN_OPERATION' || ('children' in outlined && outlined.children.length > 1)) {
-            try {
-              figma.flatten([outlined]);
-            } catch (_) { /* flatten may fail — shape is still visually correct */ }
-          }
-        }
-      } catch (e) {
-        // outlineStroke not available or failed — keep strokes as-is.
-        // This is acceptable since Figma renders strokes natively.
-        console.warn('outlineStroke failed for node:', child.name, e);
+// Two-phase post-processing after createNodeFromSvg:
+//   Phase 1: Recursively outline all strokes → fill-only nodes
+//   Phase 2: Flatten every child of the component into a single VectorNode
+function outlineAndFlatten(comp) {
+  // Phase 1: Walk the tree and outline every stroke
+  function outlineStrokes(parent) {
+    if (!('children' in parent)) return;
+    for (const child of [...parent.children]) {
+      if (child.removed) continue;
+      // Recurse into containers first (groups, frames, booleans)
+      if ('children' in child) {
+        outlineStrokes(child);
       }
+      if (child.removed) continue;
+      // Outline strokes on any node that has them
+      if ('strokes' in child && child.strokes && child.strokes.length > 0) {
+        try {
+          child.outlineStroke();
+        } catch (_) { /* not all node types support outlineStroke */ }
+      }
+    }
+  }
+  outlineStrokes(comp);
+
+  // Phase 2: Flatten all children into a single vector
+  if ('children' in comp && comp.children.length > 0) {
+    try {
+      figma.flatten([...comp.children], comp);
+    } catch (e) {
+      console.warn('flatten failed for', comp.name, e);
     }
   }
 }
@@ -188,8 +189,8 @@ async function createComponentSet(result, parentFrame) {
       // Remove the temporary frame created by createNodeFromSvg
       svgNode.remove();
 
-      // Outline all strokes → fill-only output
-      outlineAllStrokes(comp);
+      // Outline all strokes + flatten into a single vector shape
+      outlineAndFlatten(comp);
     } catch (e) {
       console.error(`createNodeFromSvg failed for ${result.name} at ${size}dp:`, e);
       // Add a placeholder text so the component isn't empty
