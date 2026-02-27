@@ -714,162 +714,13 @@ function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, san
 }
 
 // ═══════════════════════════════════════════════════════════
-// STROKE-TO-FILL CONVERSION (point-sampling offset curves)
-// ═══════════════════════════════════════════════════════════
-
-// Convert a stroked path to a filled outline path using point sampling.
-// Samples points along the path, computes perpendicular normals, offsets
-// outward/inward by half the stroke-width. Returns a fill-only d-string.
-//   - Closed paths → evenodd ring (outer + reversed inner contours)
-//   - Open paths → single closed contour (outer → end cap → inner reversed → start cap)
-//   - outerOnly=true → closed paths return only the outer contour (no inner ring)
-function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, sandbox, outerOnly) {
-  if (!pathD || strokeWidth < 0.001) return '';
-
-  const ns = 'http://www.w3.org/2000/svg';
-  const tempSvg = document.createElementNS(ns, 'svg');
-  tempSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-  const tempPath = document.createElementNS(ns, 'path');
-  tempPath.setAttribute('d', pathD);
-  tempSvg.appendChild(tempPath);
-  sandbox.appendChild(tempSvg);
-
-  let result = '';
-  try {
-    const totalLen = tempPath.getTotalLength();
-    if (totalLen < 0.001) { tempSvg.remove(); return ''; }
-
-    const closed = /[Zz]\s*$/.test(pathD.trim());
-    const halfW = strokeWidth / 2;
-    const numSamples = Math.max(16, Math.round(totalLen * 4));
-    const dt = Math.min(0.05, totalLen * 0.0005);
-    const f = v => parseFloat(v.toFixed(4));
-
-    const outerPts = [];
-    const innerPts = [];
-
-    for (let i = 0; i <= numSamples; i++) {
-      const t = Math.min((i / numSamples) * totalLen, totalLen);
-      const pt = tempPath.getPointAtLength(t);
-
-      const t0 = Math.max(0, t - dt);
-      const t1 = Math.min(totalLen, t + dt);
-      const p0 = tempPath.getPointAtLength(t0);
-      const p1 = tempPath.getPointAtLength(t1);
-      const tdx = p1.x - p0.x;
-      const tdy = p1.y - p0.y;
-      const tlen = Math.sqrt(tdx * tdx + tdy * tdy);
-
-      let nx, ny;
-      if (tlen < 1e-10) {
-        if (outerPts.length > 0) {
-          const prevO = outerPts[outerPts.length - 1];
-          const prevI = innerPts[innerPts.length - 1];
-          nx = (prevO.x - prevI.x); ny = (prevO.y - prevI.y);
-          const nl = Math.sqrt(nx * nx + ny * ny);
-          if (nl > 1e-10) { nx /= nl; ny /= nl; }
-          else { nx = 0; ny = -1; }
-        } else { nx = 0; ny = -1; }
-      } else {
-        nx = -tdy / tlen;
-        ny = tdx / tlen;
-      }
-
-      outerPts.push({ x: pt.x + nx * halfW, y: pt.y + ny * halfW });
-      innerPts.push({ x: pt.x - nx * halfW, y: pt.y - ny * halfW });
-    }
-
-    if (!closed) {
-      const EXT = halfW;
-      const s0 = tempPath.getPointAtLength(0);
-      const s1 = tempPath.getPointAtLength(Math.min(dt * 2, totalLen));
-      let bx = s0.x - s1.x, by = s0.y - s1.y;
-      const bl = Math.sqrt(bx * bx + by * by);
-      if (bl > 1e-10) { bx /= bl; by /= bl; } else { bx = 0; by = 0; }
-      outerPts.unshift({ x: outerPts[0].x + bx * EXT, y: outerPts[0].y + by * EXT });
-      innerPts.unshift({ x: innerPts[0].x + bx * EXT, y: innerPts[0].y + by * EXT });
-
-      const e0 = tempPath.getPointAtLength(totalLen);
-      const e1 = tempPath.getPointAtLength(Math.max(0, totalLen - dt * 2));
-      let fx = e0.x - e1.x, fy = e0.y - e1.y;
-      const fl = Math.sqrt(fx * fx + fy * fy);
-      if (fl > 1e-10) { fx /= fl; fy /= fl; } else { fx = 0; fy = 0; }
-      outerPts.push({ x: outerPts[outerPts.length - 1].x + fx * EXT, y: outerPts[outerPts.length - 1].y + fy * EXT });
-      innerPts.push({ x: innerPts[innerPts.length - 1].x + fx * EXT, y: innerPts[innerPts.length - 1].y + fy * EXT });
-    }
-
-    if (closed) {
-      let d = `M${f(outerPts[0].x)},${f(outerPts[0].y)}`;
-      for (let i = 1; i < outerPts.length; i++) {
-        d += ` L${f(outerPts[i].x)},${f(outerPts[i].y)}`;
-      }
-      d += ' Z';
-      if (!outerOnly) {
-        const last = innerPts.length - 1;
-        d += ` M${f(innerPts[last].x)},${f(innerPts[last].y)}`;
-        for (let i = last - 1; i >= 0; i--) {
-          d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
-        }
-        d += ' Z';
-      }
-      result = d;
-    } else {
-      let d = `M${f(outerPts[0].x)},${f(outerPts[0].y)}`;
-      for (let i = 1; i < outerPts.length; i++) {
-        d += ` L${f(outerPts[i].x)},${f(outerPts[i].y)}`;
-      }
-
-      const endO = outerPts[outerPts.length - 1];
-      const endI = innerPts[innerPts.length - 1];
-      if (linecap === 'round') {
-        d += ` A${f(halfW)},${f(halfW)} 0 0 1 ${f(endI.x)},${f(endI.y)}`;
-      } else if (linecap === 'square') {
-        const lastPt = tempPath.getPointAtLength(totalLen);
-        const prevPt = tempPath.getPointAtLength(Math.max(0, totalLen - dt));
-        let tx = lastPt.x - prevPt.x, ty = lastPt.y - prevPt.y;
-        const tl = Math.sqrt(tx * tx + ty * ty);
-        if (tl > 1e-10) { tx /= tl; ty /= tl; } else { tx = 1; ty = 0; }
-        d += ` L${f(endO.x + tx * halfW)},${f(endO.y + ty * halfW)}`;
-        d += ` L${f(endI.x + tx * halfW)},${f(endI.y + ty * halfW)}`;
-        d += ` L${f(endI.x)},${f(endI.y)}`;
-      } else {
-        d += ` L${f(endI.x)},${f(endI.y)}`;
-      }
-
-      for (let i = innerPts.length - 2; i >= 0; i--) {
-        d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
-      }
-
-      const startO = outerPts[0];
-      const startI = innerPts[0];
-      if (linecap === 'round') {
-        d += ` A${f(halfW)},${f(halfW)} 0 0 1 ${f(startO.x)},${f(startO.y)}`;
-      } else if (linecap === 'square') {
-        const firstPt = tempPath.getPointAtLength(0);
-        const nextPt = tempPath.getPointAtLength(Math.min(dt, totalLen));
-        let tx = firstPt.x - nextPt.x, ty = firstPt.y - nextPt.y;
-        const tl = Math.sqrt(tx * tx + ty * ty);
-        if (tl > 1e-10) { tx /= tl; ty /= tl; } else { tx = -1; ty = 0; }
-        d += ` L${f(startI.x + tx * halfW)},${f(startI.y + ty * halfW)}`;
-        d += ` L${f(startO.x + tx * halfW)},${f(startO.y + ty * halfW)}`;
-      }
-      d += ' Z';
-      result = d;
-    }
-  } catch (_) { result = ''; }
-
-  tempSvg.remove();
-  return result;
-}
-
-// ═══════════════════════════════════════════════════════════
 // COMPOUND PATH MERGER (the core processor)
 // ═══════════════════════════════════════════════════════════
 
 // ALL output paths are purely filled — no stroke attributes.
 // Strokes are "baked" into fill geometry:
 //   - Closed stroke-only shapes → evenodd fill (outer + inset inner boundary)
-//   - Filled paths (scaled) → compensating stroke as outer-only contour
+//   - Filled paths (scaled) → compensating stroke outline merged into fill
 //   - Open stroked / filled+stroked → stroke outline converted to fill
 function flattenToCompoundPaths(contentG, s) {
   const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
@@ -954,85 +805,51 @@ function flattenToCompoundPaths(contentG, s) {
         return;
       }
 
-      // ── Branch 2: Filled paths — bake compensating stroke into fill ──
+      // ── Branch 2: Filled paths with compensating stroke ──
+      // Plugin outputs strokes natively; code.js will outline them via Figma API.
       if (hasFill && !hasStroke) {
         const d = shapeToPathD(node);
         if (!d) return;
         const compSW = Math.max(0, 1 - s);
-        const sandbox = document.getElementById('svg-sandbox');
-        // Always emit the original fill path
-        items.push({
-          d, fill,
-          stroke: 'none', strokeWidth: '0',
-          fillRule: node.getAttribute('fill-rule') || 'nonzero',
-          linecap: '', linejoin: '', miterlimit: '',
-        });
-        // Add outer contour of compensating stroke (overlaps fill edge → no gap)
         if (compSW > 0.001) {
-          const outerD = strokeToFillPath(d, compSW, 'butt', 'miter', '10', sandbox, true);
-          if (outerD) {
-            items.push({
-              d: outerD, fill,
-              stroke: 'none', strokeWidth: '0',
-              fillRule: 'nonzero',
-              linecap: '', linejoin: '', miterlimit: '',
-            });
-          }
-        }
-        return;
-      }
-
-      // ── Branch 3: Stroked paths — convert stroke to fill outline ──
-      const d = shapeToPathD(node);
-      if (!d) return;
-      const sandbox = document.getElementById('svg-sandbox');
-
-      if (hasStroke && !hasFill) {
-        // Stroke-only open path → stroke outline becomes fill
-        const strokeOutlineD = strokeToFillPath(d, SW, linecap, linejoin, miterlimit, sandbox);
-        if (!strokeOutlineD) return;
-        const isClosed = /[Zz]\s*$/.test(d.trim());
-        items.push({
-          d:        strokeOutlineD,
-          fill:     stroke,
-          stroke:   'none',
-          strokeWidth: '0',
-          fillRule: isClosed ? 'evenodd' : 'nonzero',
-          linecap: '', linejoin: '', miterlimit: '',
-        });
-      } else if (hasStroke && hasFill) {
-        // Filled + stroked
-        const strokeOutlineD = strokeToFillPath(d, SW, linecap, linejoin, miterlimit, sandbox);
-        if (stroke === fill) {
-          // Same colour: merge fill + stroke outline as compound, nonzero
           items.push({
-            d: strokeOutlineD ? d + ' ' + strokeOutlineD : d,
-            fill,
-            stroke: 'none', strokeWidth: '0',
+            d, fill,
+            stroke: fill, strokeWidth: String(compSW),
             fillRule: node.getAttribute('fill-rule') || 'nonzero',
             linecap: '', linejoin: '', miterlimit: '',
           });
         } else {
-          // Different colours: two separate items
           items.push({
             d, fill,
             stroke: 'none', strokeWidth: '0',
             fillRule: node.getAttribute('fill-rule') || 'nonzero',
             linecap: '', linejoin: '', miterlimit: '',
           });
-          if (strokeOutlineD) {
-            const isClosed = /[Zz]\s*$/.test(d.trim());
-            items.push({
-              d: strokeOutlineD,
-              fill: stroke,
-              stroke: 'none', strokeWidth: '0',
-              fillRule: isClosed ? 'evenodd' : 'nonzero',
-              linecap: '', linejoin: '', miterlimit: '',
-            });
-          }
         }
+        return;
+      }
+
+      // ── Branch 3: Stroked paths — keep strokes for Figma import ──
+      // code.js will outline strokes after createNodeFromSvg.
+      const d = shapeToPathD(node);
+      if (!d) return;
+
+      if (hasStroke && !hasFill) {
+        items.push({
+          d,
+          fill: 'none',
+          stroke, strokeWidth: String(SW),
+          fillRule: node.getAttribute('fill-rule') || 'nonzero',
+          linecap, linejoin, miterlimit,
+        });
+      } else if (hasStroke && hasFill) {
+        items.push({
+          d, fill,
+          stroke, strokeWidth: String(SW),
+          fillRule: node.getAttribute('fill-rule') || 'nonzero',
+          linecap, linejoin, miterlimit,
+        });
       } else {
-        // No stroke — fill-only pass-through
         items.push({
           d, fill: hasFill ? fill : 'none',
           stroke: 'none', strokeWidth: '0',
@@ -1067,7 +884,14 @@ function flattenToCompoundPaths(contentG, s) {
     p.setAttribute('d', dParts.join(' '));
     if (it.fillRule === 'evenodd') p.setAttribute('fill-rule', 'evenodd');
     p.setAttribute('fill', it.fill || 'none');
-    // No stroke attributes — all strokes baked into fills
+    // Emit stroke attributes — code.js will outline strokes via Figma API
+    if (it.stroke && it.stroke !== 'none') {
+      p.setAttribute('stroke', it.stroke);
+      p.setAttribute('stroke-width', it.strokeWidth || '1');
+      if (it.linecap)    p.setAttribute('stroke-linecap', it.linecap);
+      if (it.linejoin)   p.setAttribute('stroke-linejoin', it.linejoin);
+      if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
+    }
     contentG.appendChild(p);
   });
 }
