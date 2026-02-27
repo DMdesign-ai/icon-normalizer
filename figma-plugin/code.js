@@ -56,65 +56,17 @@ async function exportIcons(nodes) {
   return icons;
 }
 
-// ─── Outline & Flatten ──────────────────────────────────
+// ─── Flatten ────────────────────────────────────────────
 
-// Three-phase post-processing after createNodeFromSvg:
-//   Phase 1: Recursively outline all strokes → fill-only nodes
-//   Phase 2: Flatten every child into a single VectorNode
-//   Phase 3: Force-clear any remaining strokes on the result
-function outlineAndFlatten(comp) {
-  // Phase 1: Walk the tree and outline every stroke.
-  // outlineStroke() replaces the stroked node with fill-only geometry.
-  // We loop until no more stroked nodes remain (outlining can create new structures).
-  function collectStrokedNodes(parent) {
-    const nodes = [];
-    if (!('children' in parent)) return nodes;
-    for (const child of parent.children) {
-      if ('strokes' in child && child.strokes && child.strokes.length > 0) {
-        nodes.push(child);
-      }
-      if ('children' in child) {
-        nodes.push(...collectStrokedNodes(child));
-      }
-    }
-    return nodes;
-  }
-
-  // Outline strokes in passes until none remain (max 5 passes as safety)
-  for (let pass = 0; pass < 5; pass++) {
-    const stroked = collectStrokedNodes(comp);
-    if (stroked.length === 0) break;
-    for (const node of stroked) {
-      if (node.removed) continue;
-      try {
-        node.outlineStroke();
-      } catch (_) {}
-    }
-  }
-
-  // Phase 2: Flatten all children into a single vector
+// Flatten all children of a component into a single VectorNode.
+// The SVGs from ui.html are already stroke-free (all geometry baked into fills),
+// so we just need to merge multiple <path> elements into one shape.
+function flattenToSingleShape(comp) {
   if ('children' in comp && comp.children.length > 0) {
     try {
-      const flat = figma.flatten([...comp.children], comp);
-      // Phase 3: Force-clear any residual strokes on the flattened result
-      if (flat && 'strokes' in flat) {
-        flat.strokes = [];
-        flat.strokeWeight = 0;
-      }
+      figma.flatten([...comp.children], comp);
     } catch (e) {
       console.warn('flatten failed for', comp.name, e);
-    }
-  }
-
-  // Safety: clear strokes on ALL remaining children (in case flatten failed)
-  if ('children' in comp) {
-    for (const child of comp.children) {
-      if ('strokes' in child && child.strokes && child.strokes.length > 0) {
-        try {
-          child.strokes = [];
-          child.strokeWeight = 0;
-        } catch (_) {}
-      }
     }
   }
 }
@@ -216,8 +168,8 @@ async function createComponentSet(result, parentFrame) {
       // Remove the temporary frame created by createNodeFromSvg
       svgNode.remove();
 
-      // Outline all strokes + flatten into a single vector shape
-      outlineAndFlatten(comp);
+      // Flatten all fill-only paths into a single vector shape
+      flattenToSingleShape(comp);
     } catch (e) {
       console.error(`createNodeFromSvg failed for ${result.name} at ${size}dp:`, e);
       // Add a placeholder text so the component isn't empty
@@ -254,7 +206,7 @@ async function main() {
   const nodes = await getIconNodes();
   if (nodes.length === 0) return;
 
-  figma.notify(`[v3.3] Normalizing ${nodes.length} icon(s)...`);
+  figma.notify(`[v3.4] Normalizing ${nodes.length} icon(s)...`);
 
   const icons = await exportIcons(nodes);
 
