@@ -58,36 +58,63 @@ async function exportIcons(nodes) {
 
 // ─── Outline & Flatten ──────────────────────────────────
 
-// Two-phase post-processing after createNodeFromSvg:
+// Three-phase post-processing after createNodeFromSvg:
 //   Phase 1: Recursively outline all strokes → fill-only nodes
-//   Phase 2: Flatten every child of the component into a single VectorNode
+//   Phase 2: Flatten every child into a single VectorNode
+//   Phase 3: Force-clear any remaining strokes on the result
 function outlineAndFlatten(comp) {
-  // Phase 1: Walk the tree and outline every stroke
-  function outlineStrokes(parent) {
-    if (!('children' in parent)) return;
-    for (const child of [...parent.children]) {
-      if (child.removed) continue;
-      // Recurse into containers first (groups, frames, booleans)
-      if ('children' in child) {
-        outlineStrokes(child);
-      }
-      if (child.removed) continue;
-      // Outline strokes on any node that has them
+  // Phase 1: Walk the tree and outline every stroke.
+  // outlineStroke() replaces the stroked node with fill-only geometry.
+  // We loop until no more stroked nodes remain (outlining can create new structures).
+  function collectStrokedNodes(parent) {
+    const nodes = [];
+    if (!('children' in parent)) return nodes;
+    for (const child of parent.children) {
       if ('strokes' in child && child.strokes && child.strokes.length > 0) {
-        try {
-          child.outlineStroke();
-        } catch (_) { /* not all node types support outlineStroke */ }
+        nodes.push(child);
+      }
+      if ('children' in child) {
+        nodes.push(...collectStrokedNodes(child));
       }
     }
+    return nodes;
   }
-  outlineStrokes(comp);
+
+  // Outline strokes in passes until none remain (max 5 passes as safety)
+  for (let pass = 0; pass < 5; pass++) {
+    const stroked = collectStrokedNodes(comp);
+    if (stroked.length === 0) break;
+    for (const node of stroked) {
+      if (node.removed) continue;
+      try {
+        node.outlineStroke();
+      } catch (_) {}
+    }
+  }
 
   // Phase 2: Flatten all children into a single vector
   if ('children' in comp && comp.children.length > 0) {
     try {
-      figma.flatten([...comp.children], comp);
+      const flat = figma.flatten([...comp.children], comp);
+      // Phase 3: Force-clear any residual strokes on the flattened result
+      if (flat && 'strokes' in flat) {
+        flat.strokes = [];
+        flat.strokeWeight = 0;
+      }
     } catch (e) {
       console.warn('flatten failed for', comp.name, e);
+    }
+  }
+
+  // Safety: clear strokes on ALL remaining children (in case flatten failed)
+  if ('children' in comp) {
+    for (const child of comp.children) {
+      if ('strokes' in child && child.strokes && child.strokes.length > 0) {
+        try {
+          child.strokes = [];
+          child.strokeWeight = 0;
+        } catch (_) {}
+      }
     }
   }
 }
@@ -227,7 +254,7 @@ async function main() {
   const nodes = await getIconNodes();
   if (nodes.length === 0) return;
 
-  figma.notify(`Normalizing ${nodes.length} icon(s)...`);
+  figma.notify(`[v3.3] Normalizing ${nodes.length} icon(s)...`);
 
   const icons = await exportIcons(nodes);
 
