@@ -109,6 +109,19 @@ header div p { font-size: 13px; color: var(--secondary); margin-top: 8px; letter
 #spec-toggle-btn svg { transition: transform 0.2s; }
 #spec-toggle-btn.open svg { transform: rotate(180deg); }
 
+.plugin-dl-btn {
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 12px; font-weight: 500; color: var(--secondary);
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: all 0.2s ease; box-shadow: var(--shadow-sm);
+  text-decoration: none; white-space: nowrap;
+}
+.plugin-dl-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: var(--shadow-md); }
+
 #spec-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -573,10 +586,17 @@ header         { animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
       <h1>Icon Safe Area Normalizer <span class="v-badge">v3.1</span></h1>
       <p>Upload SVGs · normalize strokes to 1dp · fit to keyline · save to library</p>
     </div>
-    <button id="spec-toggle-btn">
-      <span>Spec reference</span>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <a href="icon-normalizer-figma-plugin.zip" download class="plugin-dl-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 3H3v18h18v-2H5V3zm2 12l4-5.47L14.53 14 18 9.48l1.4 1.04L18 12.48l-3.47-4.04L11 13.53 7.97 9.52 7 15z" fill="currentColor"/></svg>
+        <span>Figma plugin</span>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 2v6m0 0L3.5 5.5M6 8l2.5-2.5M2 10h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <button id="spec-toggle-btn">
+        <span>Spec reference</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
   </header>
 
   <!-- Collapsible spec panel -->
@@ -1083,20 +1103,102 @@ function getContentBBox(svgString) {
   return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height, vbInfo };
 }
 
+// Geometric circle test — render a closed subpath in a temp SVG,
+// sample 12 points with getPointAtLength, check if all are
+// equidistant from center (i.e. the shape is circular).
+function isSubpathCircular(subD, sandbox) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const tempSvg = document.createElementNS(ns, 'svg');
+  tempSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  const tempPath = document.createElementNS(ns, 'path');
+  tempPath.setAttribute('d', subD);
+  tempSvg.appendChild(tempPath);
+  sandbox.appendChild(tempSvg);
+
+  let circular = false;
+  try {
+    const bb = tempPath.getBBox();
+    if (bb.width > 0 && bb.height > 0) {
+      const ratio = bb.width / bb.height;
+      if (Math.abs(ratio - 1) < 0.15) {
+        const cx = bb.x + bb.width / 2;
+        const cy = bb.y + bb.height / 2;
+        const expectedR = (bb.width + bb.height) / 4;
+        const totalLen = tempPath.getTotalLength();
+        if (totalLen > 0 && expectedR > 0) {
+          circular = true;
+          for (let i = 0; i < 12; i++) {
+            const pt = tempPath.getPointAtLength((i / 12) * totalLen);
+            const dist = Math.sqrt((pt.x - cx) ** 2 + (pt.y - cy) ** 2);
+            if (Math.abs(dist - expectedR) / expectedR > 0.12) {
+              circular = false;
+              break;
+            }
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  tempSvg.remove();
+  return circular;
+}
+
 function detectKeyline(svgString, bbox) {
-  // Quick check for circle/ellipse as dominant element
+  // Check for circle/ellipse as dominant element — supports native elements,
+  // arc-based paths, AND bezier-curve paths (common Figma/Illustrator export)
   const sandbox = document.getElementById('svg-sandbox');
   sandbox.innerHTML = svgString;
   const liveSvg = sandbox.querySelector('svg');
   let hasCircleShape = false;
+
+  // Collect path d-attributes while the SVG is in the DOM
+  const pathDatas = [];
+
   if (liveSvg) {
-    const circles = liveSvg.querySelectorAll('circle, ellipse');
+    // 1. Direct <circle> elements
+    const circles = liveSvg.querySelectorAll('circle');
     const otherShapes = liveSvg.querySelectorAll('path, rect, line, polyline, polygon');
-    // If there are circles and no (or few) other shapes → circle keyline
-    if (circles.length > 0 && otherShapes.length === 0) hasCircleShape = true;
     if (circles.length > 0 && otherShapes.length <= 1) hasCircleShape = true;
+
+    // 2. <ellipse> elements with nearly equal rx/ry
+    if (!hasCircleShape) {
+      for (const el of liveSvg.querySelectorAll('ellipse')) {
+        const rx = parseFloat(el.getAttribute('rx') || 0);
+        const ry = parseFloat(el.getAttribute('ry') || 0);
+        if (rx > 0 && ry > 0 && Math.abs(rx / ry - 1) < 0.15) {
+          hasCircleShape = true;
+          break;
+        }
+      }
+    }
+
+    // Collect path data for geometric check (step 3)
+    if (!hasCircleShape) {
+      for (const p of liveSvg.querySelectorAll('path')) {
+        const d = p.getAttribute('d') || '';
+        if (d) pathDatas.push(d);
+      }
+    }
   }
   sandbox.innerHTML = '';
+
+  // 3. Geometric circle detection — split compound paths into subpaths,
+  //    render each in a temp SVG, sample points to check circularity.
+  //    Works for arcs, cubic beziers, or any curve that forms a circle.
+  if (!hasCircleShape && pathDatas.length > 0) {
+    for (const d of pathDatas) {
+      const subpaths = d.split(/(?=[Mm])/).filter(s => s.trim());
+      for (const sub of subpaths) {
+        if (!/[Zz]/.test(sub)) continue; // only closed subpaths
+        if (isSubpathCircular(sub, sandbox)) {
+          hasCircleShape = true;
+          break;
+        }
+      }
+      if (hasCircleShape) break;
+    }
+  }
 
   if (!bbox || bbox.width === 0 || bbox.height === 0) return 'square';
 
@@ -1224,19 +1326,170 @@ function makeInnerDFromPath(outerD) {
   return transformPathD(outerD, mat);
 }
 
+// Convert a stroked path to a filled outline path using point sampling.
+// Samples points along the path, computes perpendicular normals, offsets
+// outward/inward by half the stroke-width. Returns a fill-only d-string.
+//   - Closed paths → evenodd ring (outer + reversed inner contours)
+//   - Open paths → single closed contour (outer → end cap → inner reversed → start cap)
+function strokeToFillPath(pathD, strokeWidth, linecap, linejoin, miterlimit, sandbox) {
+  if (!pathD || strokeWidth < 0.001) return '';
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const tempSvg = document.createElementNS(ns, 'svg');
+  tempSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  const tempPath = document.createElementNS(ns, 'path');
+  tempPath.setAttribute('d', pathD);
+  tempSvg.appendChild(tempPath);
+  sandbox.appendChild(tempSvg);
+
+  let result = '';
+  try {
+    const totalLen = tempPath.getTotalLength();
+    if (totalLen < 0.001) { tempSvg.remove(); return ''; }
+
+    const closed = /[Zz]\s*$/.test(pathD.trim());
+    const halfW = strokeWidth / 2;
+    const numSamples = Math.max(16, Math.round(totalLen * 4));
+    const dt = Math.min(0.05, totalLen * 0.0005);
+    const f = v => parseFloat(v.toFixed(4));
+
+    const outerPts = [];
+    const innerPts = [];
+
+    for (let i = 0; i <= numSamples; i++) {
+      const t = Math.min((i / numSamples) * totalLen, totalLen);
+      const pt = tempPath.getPointAtLength(t);
+
+      // Central-difference tangent
+      const t0 = Math.max(0, t - dt);
+      const t1 = Math.min(totalLen, t + dt);
+      const p0 = tempPath.getPointAtLength(t0);
+      const p1 = tempPath.getPointAtLength(t1);
+      const tdx = p1.x - p0.x;
+      const tdy = p1.y - p0.y;
+      const tlen = Math.sqrt(tdx * tdx + tdy * tdy);
+
+      let nx, ny;
+      if (tlen < 1e-10) {
+        if (outerPts.length > 0) {
+          // Reuse previous normal direction for degenerate tangent
+          const prevO = outerPts[outerPts.length - 1];
+          const prevI = innerPts[innerPts.length - 1];
+          nx = (prevO.x - prevI.x); ny = (prevO.y - prevI.y);
+          const nl = Math.sqrt(nx * nx + ny * ny);
+          if (nl > 1e-10) { nx /= nl; ny /= nl; }
+          else { nx = 0; ny = -1; }
+        } else { nx = 0; ny = -1; }
+      } else {
+        // Normal = perpendicular to tangent (left-hand rule)
+        nx = -tdy / tlen;
+        ny = tdx / tlen;
+      }
+
+      outerPts.push({ x: pt.x + nx * halfW, y: pt.y + ny * halfW });
+      innerPts.push({ x: pt.x - nx * halfW, y: pt.y - ny * halfW });
+    }
+
+    // For open paths, extend endpoints along the tangent direction so adjacent
+    // fill outlines overlap at junctions instead of leaving anti-aliasing gaps.
+    if (!closed) {
+      const EXT = halfW; // extend by half the stroke width at each end
+
+      // Start extension (backward along path direction)
+      const s0 = tempPath.getPointAtLength(0);
+      const s1 = tempPath.getPointAtLength(Math.min(dt * 2, totalLen));
+      let bx = s0.x - s1.x, by = s0.y - s1.y;
+      const bl = Math.sqrt(bx * bx + by * by);
+      if (bl > 1e-10) { bx /= bl; by /= bl; } else { bx = 0; by = 0; }
+      outerPts.unshift({ x: outerPts[0].x + bx * EXT, y: outerPts[0].y + by * EXT });
+      innerPts.unshift({ x: innerPts[0].x + bx * EXT, y: innerPts[0].y + by * EXT });
+
+      // End extension (forward along path direction)
+      const e0 = tempPath.getPointAtLength(totalLen);
+      const e1 = tempPath.getPointAtLength(Math.max(0, totalLen - dt * 2));
+      let fx = e0.x - e1.x, fy = e0.y - e1.y;
+      const fl = Math.sqrt(fx * fx + fy * fy);
+      if (fl > 1e-10) { fx /= fl; fy /= fl; } else { fx = 0; fy = 0; }
+      outerPts.push({ x: outerPts[outerPts.length - 1].x + fx * EXT, y: outerPts[outerPts.length - 1].y + fy * EXT });
+      innerPts.push({ x: innerPts[innerPts.length - 1].x + fx * EXT, y: innerPts[innerPts.length - 1].y + fy * EXT });
+    }
+
+    if (closed) {
+      // Ring: outer contour + reversed inner contour (use with fill-rule="evenodd")
+      let d = `M${f(outerPts[0].x)},${f(outerPts[0].y)}`;
+      for (let i = 1; i < outerPts.length; i++) {
+        d += ` L${f(outerPts[i].x)},${f(outerPts[i].y)}`;
+      }
+      d += ' Z';
+      const last = innerPts.length - 1;
+      d += ` M${f(innerPts[last].x)},${f(innerPts[last].y)}`;
+      for (let i = last - 1; i >= 0; i--) {
+        d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
+      }
+      d += ' Z';
+      result = d;
+    } else {
+      // Open path: outer → end cap → inner reversed → start cap → close
+      let d = `M${f(outerPts[0].x)},${f(outerPts[0].y)}`;
+      for (let i = 1; i < outerPts.length; i++) {
+        d += ` L${f(outerPts[i].x)},${f(outerPts[i].y)}`;
+      }
+
+      // End cap
+      const endO = outerPts[outerPts.length - 1];
+      const endI = innerPts[innerPts.length - 1];
+      if (linecap === 'round') {
+        d += ` A${f(halfW)},${f(halfW)} 0 0 1 ${f(endI.x)},${f(endI.y)}`;
+      } else if (linecap === 'square') {
+        const lastPt = tempPath.getPointAtLength(totalLen);
+        const prevPt = tempPath.getPointAtLength(Math.max(0, totalLen - dt));
+        let tx = lastPt.x - prevPt.x, ty = lastPt.y - prevPt.y;
+        const tl = Math.sqrt(tx * tx + ty * ty);
+        if (tl > 1e-10) { tx /= tl; ty /= tl; } else { tx = 1; ty = 0; }
+        d += ` L${f(endO.x + tx * halfW)},${f(endO.y + ty * halfW)}`;
+        d += ` L${f(endI.x + tx * halfW)},${f(endI.y + ty * halfW)}`;
+        d += ` L${f(endI.x)},${f(endI.y)}`;
+      } else {
+        // butt cap — straight line
+        d += ` L${f(endI.x)},${f(endI.y)}`;
+      }
+
+      // Inner contour reversed
+      for (let i = innerPts.length - 2; i >= 0; i--) {
+        d += ` L${f(innerPts[i].x)},${f(innerPts[i].y)}`;
+      }
+
+      // Start cap
+      const startO = outerPts[0];
+      const startI = innerPts[0];
+      if (linecap === 'round') {
+        d += ` A${f(halfW)},${f(halfW)} 0 0 1 ${f(startO.x)},${f(startO.y)}`;
+      } else if (linecap === 'square') {
+        const firstPt = tempPath.getPointAtLength(0);
+        const nextPt = tempPath.getPointAtLength(Math.min(dt, totalLen));
+        let tx = firstPt.x - nextPt.x, ty = firstPt.y - nextPt.y;
+        const tl = Math.sqrt(tx * tx + ty * ty);
+        if (tl > 1e-10) { tx /= tl; ty /= tl; } else { tx = -1; ty = 0; }
+        d += ` L${f(startI.x + tx * halfW)},${f(startI.y + ty * halfW)}`;
+        d += ` L${f(startO.x + tx * halfW)},${f(startO.y + ty * halfW)}`;
+      }
+      d += ' Z';
+      result = d;
+    }
+  } catch (_) { result = ''; }
+
+  tempSvg.remove();
+  return result;
+}
+
 // Merge all shapes in contentG into flat compound paths grouped by style signature.
-// Removes all <g> wrappers → Figma sees: icon-content > 1–N <path> elements (flat Vectors).
+// Removes all <g> wrappers → flat <path> elements only.
 //
-// Key behaviour for inside-stroke shapes (the common Figma export pattern):
-//   Figma exports "Inside" stroke by doubling stroke-width + adding a clip-path.
-//   We remove clip-paths (v2.5). Without a clip-path the doubled stroke bleeds 0.5dp
-//   outside the shape boundary and looks visually heavier at larger sizes.
-//   Fix: for ALL stroke-only closed shapes (rect/circle/ellipse AND closed <path>),
-//   we convert to a filled evenodd "frame" path: outer boundary + inner boundary
-//   inset by 1dp. This perfectly replicates 1dp inside stroke with no outward bleed,
-//   and the visual weight is identical at 16, 24 and 32dp because 1 SVG unit = 1dp.
-//
-// Open paths (lines, polylines) and filled shapes are left as-is with stroke-width="1".
+// ALL output paths are purely filled — no stroke attributes.
+// Strokes are "baked" into fill geometry:
+//   - Closed stroke-only shapes → evenodd fill (outer + inset inner boundary)
+//   - Filled paths (scaled) → compensating stroke outline merged into fill
+//   - Open stroked / filled+stroked → stroke outline converted to fill
 function flattenToCompoundPaths(contentG, s) {
   const SHAPE_TAGS = new Set(['path', 'line', 'circle', 'ellipse', 'rect', 'polyline', 'polygon']);
   // Inside-stroke visual weight in dp. With viewBox/width/height set to the canvas size,
@@ -1328,36 +1581,94 @@ function flattenToCompoundPaths(contentG, s) {
         return;
       }
 
-      // ── Filled paths: add compensating stroke to maintain ~1dp line width ──
+      // ── Filled paths: bake compensating stroke into fill geometry ──
       // When geometry is scaled by s < 1, filled line widths become s dp.
-      // Adding a matching-colour stroke of (1−s) dp restores the visual width to ~1dp.
+      // We compute a stroke outline of (1−s) dp in the same colour and merge it
+      // with the original fill as a compound path (nonzero, overlap is harmless).
       if (hasFill && !hasStroke) {
         const d = shapeToPathD(node);
         if (!d) return;
         const compSW = Math.max(0, 1 - s);
-        items.push({
-          d,
-          fill,
-          stroke:      compSW > 0.001 ? fill : 'none',
-          strokeWidth: compSW > 0.001 ? String(parseFloat(compSW.toFixed(4))) : '0',
-          fillRule:    node.getAttribute('fill-rule') || 'nonzero',
-          linecap:     'butt',
-          linejoin:    'miter',
-          miterlimit:  '10',
-        });
+        const sandbox = document.getElementById('svg-sandbox');
+        if (compSW > 0.001) {
+          const strokeOutlineD = strokeToFillPath(d, compSW, 'butt', 'miter', '10', sandbox);
+          items.push({
+            d:           strokeOutlineD ? d + ' ' + strokeOutlineD : d,
+            fill,
+            stroke:      'none',
+            strokeWidth: '0',
+            fillRule:    node.getAttribute('fill-rule') || 'nonzero',
+            linecap: '', linejoin: '', miterlimit: '',
+          });
+        } else {
+          items.push({
+            d, fill,
+            stroke: 'none', strokeWidth: '0',
+            fillRule: node.getAttribute('fill-rule') || 'nonzero',
+            linecap: '', linejoin: '', miterlimit: '',
+          });
+        }
         return;
       }
 
-      // ── Normal shape ── (open stroked paths, filled+stroked, etc.)
+      // ── All other stroked paths: convert stroke to fill outline ──
       const d = shapeToPathD(node);
       if (!d) return;
-      items.push({
-        d,
-        stroke, fill,
-        strokeWidth: hasStroke ? '1' : '0',   // normalize strokes to 1dp
-        fillRule: node.getAttribute('fill-rule') || 'nonzero',
-        linecap, linejoin, miterlimit,
-      });
+      const sandbox = document.getElementById('svg-sandbox');
+
+      if (hasStroke && !hasFill) {
+        // Stroke-only open path (lines, polylines, open paths)
+        const strokeOutlineD = strokeToFillPath(d, SW, linecap, linejoin, miterlimit, sandbox);
+        if (!strokeOutlineD) return;
+        const isClosed = /[Zz]\s*$/.test(d.trim());
+        items.push({
+          d:        strokeOutlineD,
+          fill:     stroke,           // stroke colour becomes fill
+          stroke:   'none',
+          strokeWidth: '0',
+          fillRule: isClosed ? 'evenodd' : 'nonzero',
+          linecap: '', linejoin: '', miterlimit: '',
+        });
+      } else if (hasStroke && hasFill) {
+        // Filled + stroked
+        const strokeOutlineD = strokeToFillPath(d, SW, linecap, linejoin, miterlimit, sandbox);
+        if (stroke === fill) {
+          // Same colour: merge fill + stroke outline as compound, nonzero
+          items.push({
+            d: strokeOutlineD ? d + ' ' + strokeOutlineD : d,
+            fill,
+            stroke: 'none', strokeWidth: '0',
+            fillRule: node.getAttribute('fill-rule') || 'nonzero',
+            linecap: '', linejoin: '', miterlimit: '',
+          });
+        } else {
+          // Different colours: two separate items
+          items.push({
+            d, fill,
+            stroke: 'none', strokeWidth: '0',
+            fillRule: node.getAttribute('fill-rule') || 'nonzero',
+            linecap: '', linejoin: '', miterlimit: '',
+          });
+          if (strokeOutlineD) {
+            const isClosed = /[Zz]\s*$/.test(d.trim());
+            items.push({
+              d: strokeOutlineD,
+              fill: stroke,
+              stroke: 'none', strokeWidth: '0',
+              fillRule: isClosed ? 'evenodd' : 'nonzero',
+              linecap: '', linejoin: '', miterlimit: '',
+            });
+          }
+        }
+      } else {
+        // No stroke — fill-only pass-through
+        items.push({
+          d, fill: hasFill ? fill : 'none',
+          stroke: 'none', strokeWidth: '0',
+          fillRule: node.getAttribute('fill-rule') || 'nonzero',
+          linecap: '', linejoin: '', miterlimit: '',
+        });
+      }
     } else {
       Array.from(node.childNodes).forEach(collect);
     }
@@ -1387,15 +1698,7 @@ function flattenToCompoundPaths(contentG, s) {
     p.setAttribute('d', dParts.join(' '));
     if (it.fillRule === 'evenodd') p.setAttribute('fill-rule', 'evenodd');
     p.setAttribute('fill', it.fill || 'none');
-    if (it.stroke && it.stroke !== 'none') {
-      p.setAttribute('stroke',       it.stroke);
-      p.setAttribute('stroke-width', it.strokeWidth || '1');
-      if (it.linecap)    p.setAttribute('stroke-linecap',    it.linecap);
-      if (it.linejoin)   p.setAttribute('stroke-linejoin',   it.linejoin);
-      if (it.miterlimit) p.setAttribute('stroke-miterlimit', it.miterlimit);
-    } else {
-      p.setAttribute('stroke', 'none');
-    }
+    // No stroke attributes — all strokes baked into fills
     contentG.appendChild(p);
   });
 }
